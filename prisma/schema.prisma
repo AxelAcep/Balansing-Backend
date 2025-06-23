@@ -1,0 +1,90 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  email     String    @id
+  nama      String?
+  jenis     String
+  password  String
+
+  kader     Kader?     @relation("KaderUser")
+  ibuRumah  IbuRumah?  @relation("IbuUser")
+}
+
+model Kader {
+  id             String    @id @default(cuid())
+  email          String    @unique
+  namaPuskesmas  String
+  namaPosyandu   String
+  provinsi       String
+  kota           String
+  kecamatan      String
+  kelurahan      String
+  rt             String
+  rw             String
+  kodePos        String
+
+  user           User      @relation("KaderUser", fields: [email], references: [email])
+  recapList      RecapRt[]
+}
+
+model IbuRumah {
+  id         String     @id @default(cuid())
+  email      String     @unique
+  provinsi   String
+  kota       String
+  kecamatan  String
+  kelurahan  String
+  rt         String
+  rw         String
+  kodePos    String
+  alamat     String
+  usia       Int
+  noTelp     String
+
+  user       User       @relation("IbuUser", fields: [email], references: [email])
+  anakAnak   AnakIbu[]
+}
+
+model AnakIbu {
+  id           String     @id @default(cuid())
+  ibuId        String
+  nama         String
+  usia         Int
+  beratBadan   Float
+  tinggiBadan  Float
+  stunting     Boolean
+  anemia       Boolean
+
+  ibu          IbuRumah   @relation(fields: [ibuId], references: [id])
+}
+
+model AnakKader {
+  id           String     @id @default(cuid())
+  nama         String
+  namaIbu      String
+  usia         Int
+  beratBadan   Float
+  tinggiBadan  Float
+  anemia       Boolean
+  stunting     Boolean
+
+  recap        RecapRt?
+}
+
+model RecapRt {
+  id           String     @id @default(cuid())
+  anakKaderId  String     @unique
+  kaderEmail   String
+  tanggal      DateTime
+  rt           String
+
+  anakKader    AnakKader  @relation(fields: [anakKaderId], references: [id])
+  kader        Kader      @relation(fields: [kaderEmail], references: [email])
+}
