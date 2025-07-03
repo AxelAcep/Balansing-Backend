@@ -9,8 +9,8 @@ datasource db {
 
 model User {
   email     String    @id
+  id        String
   jenis     String
-  password  String
 
   kader     Kader?     @relation("KaderUser")
   ibuRumah  IbuRumah?  @relation("IbuUser")
