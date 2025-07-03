@@ -13,7 +13,9 @@
   "license": "ISC",
   "dependencies": {
     "@prisma/client": "^6.10.1",
+    "@supabase/supabase-js": "^2.50.3",
     "@types/node": "^20.9.1",
+    "bcryptjs": "^3.0.2",
     "cors": "^2.8.5",
     "dotenv": "^16.5.0",
     "env": "^0.0.2",

@@ -9,7 +9,6 @@ datasource db {
 
 model User {
   email     String    @id
-  nama      String?
   jenis     String
   password  String
 
@@ -18,7 +17,7 @@ model User {
 }
 
 model Kader {
-  id             String    @id @default(cuid())
+  id             String    @id 
   email          String    @unique
   namaPuskesmas  String
   namaPosyandu   String
@@ -28,7 +27,7 @@ model Kader {
   kelurahan      String
   rt             String
   rw             String
-  kodePos        String
+  kodePos        String?
 
   user           User      @relation("KaderUser", fields: [email], references: [email])
   recapList      RecapRt[]
