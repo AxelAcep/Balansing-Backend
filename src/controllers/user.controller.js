@@ -195,7 +195,7 @@ const login = async (req, res, next) => {
         // Anda bisa menambahkan data lain dari userProfile atau supabaseUser
       },
       secretKey,
-      { expiresIn: '1h' } // Sangat disarankan untuk menggunakan waktu kedaluwarsa pada JWT
+      { expiresIn: '1000h' } // Sangat disarankan untuk menggunakan waktu kedaluwarsa pada JWT
     );
 
     res.status(200).json({

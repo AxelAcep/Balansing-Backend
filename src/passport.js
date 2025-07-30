@@ -2,6 +2,7 @@
 const passport = require('passport');
 const LocalStrategy = require('passport-local').Strategy;
 const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
 const { PrismaClient } = require('@prisma/client');
 
 const prisma = new PrismaClient();
@@ -43,6 +44,23 @@ passport.use(
   )
 );
 
+function authenticateJWT(req, res, next) {
+  const token = req.headers.authorization?.split(' ')[1];
+
+  if (!token) {
+    return res.status(401).json({ message: 'Unauthorized. Token is missing.' });
+  }
+
+  jwt.verify(token, process.env.JWT_SECRET, (err, dosen) => {
+    if (err) {
+      return res.status(403).json({ message: 'Invalid token.' });
+    }
+
+    req.dosen = dosen; // menyimpan informasi dosen di req
+    next();
+  });
+}
+
 // Optional: Serialisasi dan Deserialisasi user (jika Anda menggunakan session)
 // passport.serializeUser((user, done) => {
 //   done(null, user.email); // Simpan email user di sesi
@@ -59,4 +77,4 @@ passport.use(
 //   }
 // });
 
-module.exports = passport; // Ekspor instance passport yang sudah dikonfigurasi
+module.exports = { passport, authenticateJWT };
