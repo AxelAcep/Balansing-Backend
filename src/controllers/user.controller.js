@@ -423,7 +423,59 @@ const updatePasswordFromForm = async (req, res) => {
     }
 };
 
+const changePassword = async (req, res) => {
+  const { email, oldPassword, newPassword } = req.body;
+
+  if (!email || !oldPassword || !newPassword) {
+    return res.status(400).json({ message: 'Email, password lama, dan password baru harus diisi.' });
+  }
+
+  if (newPassword.length < 6) {
+    return res.status(400).json({ message: 'Password baru minimal 6 karakter.' });
+  }
+
+  try {
+    // 1. Authenticate the user with their old email and password using Supabase
+    // This implicitly verifies the old password
+    const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+      email: email,
+      password: oldPassword,
+    });
+
+    if (signInError) {
+      console.error("Supabase sign-in error during password change:", signInError.message);
+      // Return a generic "invalid credentials" message for security reasons
+      return res.status(401).json({ success: false, message: 'Email atau password lama salah.' });
+    }
+
+    // Ensure user and session are obtained from the sign-in
+    if (!signInData || !signInData.user || !signInData.session) {
+      return res.status(401).json({ success: false, message: 'Autentikasi gagal.' });
+    }
+
+    // 2. If authentication is successful, update the user's password using the session
+    // Supabase automatically handles hashing the new password
+    const { data: updateData, error: updateError } = await supabase.auth.updateUser({
+      password: newPassword,
+    });
+
+    if (updateError) {
+      console.error("Supabase update password error:", updateError.message);
+      return res.status(500).json({success: false, message: 'Gagal memperbarui password di Supabase.', error: updateError.message });
+    }
+
+    // Optional: Re-authenticate to get a fresh session if needed, though update user usually refreshes it
+    // Or simply confirm the password has been changed
+    res.status(200).json({ success: true, message: 'Password berhasil diubah.' });
+
+  } catch (error) {
+    console.error("General error during password change:", error);
+    res.status(500).json({ success: false,  message: 'Terjadi kesalahan server.', error: error.message });
+  }
+};
+
 module.exports = {
+  changePassword,
   login,
   registerKader,
   logout,
