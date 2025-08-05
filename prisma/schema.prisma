@@ -8,82 +8,75 @@ datasource db {
 }
 
 model User {
-  email     String    @id
-  id        String
-  jenis     String
+  email      String     @id
+  id         String
+  jenis      String
 
-  kader     Kader?     @relation("KaderUser")
-  ibuRumah  IbuRumah?  @relation("IbuUser")
+  kader      Kader?     @relation("KaderUser")
+  ibuRumah   IbuRumah?  @relation("IbuUser")
 }
 
 model Kader {
-  id             String    @id 
-  email          String    @unique
-  namaPuskesmas  String
-  namaPosyandu   String
-  provinsi       String
-  kota           String
-  kecamatan      String
-  kelurahan      String
-  rt             String
-  rw             String
-  kodePos        String?
+  id              String      @id @default(cuid())
+  email           String      @unique
+  namaPuskesmas   String
+  namaPosyandu    String
+  provinsi        String
+  kota            String
+  kecamatan       String
+  kelurahan       String
+  rt              String
+  rw              String
+  kodePos         String?
 
-  user           User      @relation("KaderUser", fields: [email], references: [email])
-  recapList      RecapRt[]
+  user            User        @relation("KaderUser", fields: [email], references: [email])
+  anakKader       AnakKader[]
 }
 
 model IbuRumah {
-  id         String     @id @default(cuid())
-  email      String     @unique
-  provinsi   String
-  kota       String
-  kecamatan  String
-  kelurahan  String
-  rt         String
-  rw         String
-  kodePos    String
-  alamat     String
-  usia       Int
-  noTelp     String
+  id          String      @id @default(cuid())
+  email       String      @unique
+  provinsi    String
+  kota        String
+  kecamatan   String
+  kelurahan   String
+  rt          String
+  rw          String
+  kodePos     String
+  alamat      String
+  usia        Int
+  noTelp      String
 
-  user       User       @relation("IbuUser", fields: [email], references: [email])
-  anakAnak   AnakIbu[]
+  user        User        @relation("IbuUser", fields: [email], references: [email])
+  anakAnak    AnakIbu[]
 }
 
 model AnakIbu {
-  id           String     @id @default(cuid())
-  ibuId        String
-  nama         String
-  usia         Int
-  beratBadan   Float
-  tinggiBadan  Float
-  stunting     Boolean
-  anemia       Boolean
+  id            String    @id @default(cuid())
+  ibuId         String
+  nama          String
+  usia          Int
+  beratBadan    Float
+  tinggiBadan   Float
+  stunting      Boolean
+  anemia        Boolean
+  jenisKelamin  String
 
-  ibu          IbuRumah   @relation(fields: [ibuId], references: [id])
+  ibu           IbuRumah  @relation(fields: [ibuId], references: [id])
 }
 
 model AnakKader {
-  id           String     @id @default(cuid())
-  nama         String
-  namaIbu      String
-  usia         Int
-  beratBadan   Float
-  tinggiBadan  Float
-  anemia       Boolean
-  stunting     Boolean
-
-  recap        RecapRt?
-}
-
-model RecapRt {
-  id           String     @id @default(cuid())
-  anakKaderId  String     @unique
-  kaderEmail   String
-  tanggal      DateTime
-  rt           String
-
-  anakKader    AnakKader  @relation(fields: [anakKaderId], references: [id])
-  kader        Kader      @relation(fields: [kaderEmail], references: [email])
+  id            String    @id @default(cuid())
+  nama          String
+  namaIbu       String
+  usia          Int
+  beratBadan    Float
+  tinggiBadan   Float
+  anemia        Boolean
+  stunting      Boolean
+  jenisKelamin  String
+  tanggal       DateTime?
+  
+  kaderEmail    String
+  kader         Kader     @relation(fields: [kaderEmail], references: [email])
 }

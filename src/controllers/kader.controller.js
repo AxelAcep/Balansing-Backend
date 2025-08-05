@@ -7,6 +7,7 @@ const { createClient } = require('@supabase/supabase-js');
 const crypto = require('crypto');
 const passport = require('../passport'); // Jika Anda menggunakan passport
 const jwt = require('jsonwebtoken');
+const { get } = require("http");
 
 // Supabase Client untuk sisi client (jika Anda menggunakannya di backend untuk beberapa kasus)
 // Biasanya ini untuk operasi yang memerlukan kunci ANON_KEY
@@ -92,7 +93,82 @@ const editKader = async (req, res) => {
   }
 };
 
+const getRecap = async (req, res) => {
+  try {
+    const { email } = req.params; // Assuming email is available in req.user from JWT authentication
+    if (!email) {
+      return res.status(400).json({ error: "Email is required." });
+    }
+
+    const recap = await prisma.anakKader.findMany({
+      where: { kaderEmail: email },
+    });
+
+    res.status(200).json(recap || { message: "No recap found for this kader." });
+  } catch (error) {
+    console.error("Error fetching recap:", error);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+}
+
+const unggahAnak = async (req, res) => {
+  try {
+    const {
+      email, // This will be kader's email for RecapRt
+      tanggalPemeriksaan,
+      namaIbu,
+      namaAnak,
+      umurTahun,
+      umurBulan,
+      beratBadan,
+      tinggiBadan, // Added based on AnakKader schema
+      jenisKelamin,
+      konjungtivitaNormal,
+      kukuBersih,
+      tampakLemas,
+      tampakPucat,
+      riwayatAnemia,
+      // Capturing any other fields sent in the request body that are not explicitly used
+    } = req.body;
+
+    console.log(konjungtivitaNormal, kukuBersih, tampakLemas, tampakPucat, riwayatAnemia);
+
+    // --- Data Preparation for AnakKader ---
+    // Convert age to total months
+    const usiaInMonths = (parseInt(umurTahun) * 12) + parseInt(umurBulan);
+
+    const anakKaderData = {
+      nama: namaAnak,
+      jenisKelamin: jenisKelamin, // Assuming 'L' for
+      namaIbu: namaIbu,
+      usia: usiaInMonths, // Age in total months
+      beratBadan: parseFloat(beratBadan),
+      tinggiBadan: parseFloat(tinggiBadan), // Using tinggiBadan from req.body
+      anemia: true, // Temporarily set to true as requested
+      stunting: true, // Temporarily set to true as requested
+      tanggal: new Date(tanggalPemeriksaan), // Ensure it's a Date object
+      kaderEmail: email, // Kader's email for linking
+    };
+
+    // Create AnakKader record
+    const anakKaderRecord = await prisma.anakKader.create({
+      data: anakKaderData,
+    });
+
+
+    res.status(201).json({
+      message: "Anak uploaded successfully and RecapRt created/updated",
+      anakKader: anakKaderRecord,
+    });
+  } catch (error) {
+    console.error("Error uploading anak:", error);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+};
+
 module.exports = {
     getKader,
-    editKader
+    editKader,
+    unggahAnak,
+    getRecap,
 };
