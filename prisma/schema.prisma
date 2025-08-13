@@ -76,6 +76,11 @@ model AnakKader {
   stunting      Boolean
   jenisKelamin  String
   tanggal       DateTime?
+  konjungtivitaNormal  Boolean?
+  kukuBersih            Boolean?
+  tampakLemas           Boolean?
+  tampakPucat           Boolean?
+  riwayatAnemia         Boolean?
   
   kaderEmail    String
   kader         Kader     @relation(fields: [kaderEmail], references: [email])
