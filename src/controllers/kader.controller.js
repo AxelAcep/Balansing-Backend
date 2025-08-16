@@ -147,41 +147,115 @@ const getRecapById = async (req, res) => {
 const unggahAnak = async (req, res) => {
   try {
     const {
-      email, 
+      email,
       tanggalPemeriksaan,
       namaIbu,
       namaAnak,
       umurTahun,
       umurBulan,
       beratBadan,
-      tinggiBadan, 
+      tinggiBadan,
       jenisKelamin,
-      konjungtivitaNormal: konjungtivitaNormal,
-      kukuBersih: kukuBersih,
-      tampakLemas: tampakLemas,
-      tampakPucat: tampakPucat,
-      riwayatAnemia: riwayatAnemia,
-
+      konjungtivitaNormal,
+      kukuBersih,
+      tampakLemas,
+      tampakPucat,
+      riwayatAnemia,
     } = req.body;
 
     console.log(konjungtivitaNormal, kukuBersih, tampakLemas, tampakPucat, riwayatAnemia);
 
     const usiaInMonths = (parseInt(umurTahun) * 12) + parseInt(umurBulan);
-    //Panggil API Python dengan parameter konjungtivitaNormal, kukuBersih, tampakLemas, tampakPucat, riwayatAnemia
-    //Return stunting dan anemia
+
+    // Panggil API untuk memeriksa anemia
+    let isAnemic;
+    try {
+      const anemiaResponse = await fetch('http://localhost:4500/anemia', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          lemas: konjungtivitaNormal,
+          riwayat: riwayatAnemia,
+          konjungtiva: konjungtivitaNormal,
+          kuku: kukuBersih
+        }),
+      });
+
+      if (!anemiaResponse.ok) {
+        throw new Error(`HTTP error! status: ${anemiaResponse.status}`);
+      }
+
+      const anemiaResult = await anemiaResponse.json();
+      isAnemic = anemiaResult; // Mengambil nilai boolean dari respons
+    } catch (error) {
+      console.error("Error calling anemia API:", error);
+      // Lempar error untuk menghentikan proses unggah jika API gagal
+      throw new Error("Failed to get anemia status from API.");
+    }
+
+    // Panggil API untuk memeriksa stunting
+    let stuntingStatus;
+    try {
+      // Mengubah jenis kelamin menjadi 'l' atau 'p' sebelum dikirim ke API
+      let kelaminUntukAPI;
+      if (jenisKelamin.toLowerCase() === 'laki-laki') {
+        kelaminUntukAPI = 'l';
+      } else if (jenisKelamin.toLowerCase() === 'perempuan') {
+        kelaminUntukAPI = 'p';
+      } else {
+        // Fallback jika input tidak sesuai
+        console.warn("Invalid 'jenisKelamin' value. Defaulting to 'l'.");
+        kelaminUntukAPI = 'l';
+      }
+
+      const stuntingResponse = await fetch('http://localhost:4500/stunting', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          // Mengubah key agar sesuai dengan model FastAPI
+          usiaBulan: usiaInMonths,
+          tinggi: parseFloat(tinggiBadan),
+          kelamin: kelaminUntukAPI, // Menggunakan nilai yang sudah diubah
+        }),
+      });
+
+      if (!stuntingResponse.ok) {
+        // Log pesan error dari server Python jika tersedia
+        const errorText = await stuntingResponse.text();
+        console.error(`API Error Response: ${errorText}`);
+        throw new Error(`HTTP error! status: ${stuntingResponse.status}`);
+      }
+
+      const stuntingResult = await stuntingResponse.json();
+      stuntingStatus = stuntingResult; // Mengambil nilai string dari respons
+    } catch (error) {
+      console.error("Error calling stunting API:", error);
+      // Lempar error untuk menghentikan proses unggah jika API gagal
+      throw new Error("Failed to get stunting status from API.");
+    }
+
+    console.log(isAnemic);
+    console.log(stuntingStatus);
+
+    if(stuntingStatus == "Sangat Pendek"){
+      stuntingStatus = "SangatPendek";
+    }
 
     const anakKaderData = {
       nama: namaAnak,
-      jenisKelamin: jenisKelamin, // Assuming 'L' for
+      jenisKelamin: jenisKelamin,
       namaIbu: namaIbu,
-      usia: usiaInMonths, // Age in total months
+      usia: usiaInMonths,
       beratBadan: parseFloat(beratBadan),
-      tinggiBadan: parseFloat(tinggiBadan), // Using tinggiBadan from req.body
-      anemia: true, // Temporarily set to true as requested
-      stunting: true, // Temporarily set to true as requested
-      tanggal: new Date(tanggalPemeriksaan), // Ensure it's a Date object
-      kaderEmail: email, // Kader's email for linking
-
+      tinggiBadan: parseFloat(tinggiBadan),
+      anemia: isAnemic, // Nilai diperbarui dari respons API
+      stunting: stuntingStatus, // Nilai diperbarui dari respons API
+      tanggal: new Date(tanggalPemeriksaan),
+      kaderEmail: email,
       konjungtivitaNormal: konjungtivitaNormal,
       kukuBersih: kukuBersih,
       tampakLemas: tampakLemas,
@@ -194,7 +268,6 @@ const unggahAnak = async (req, res) => {
       data: anakKaderData,
     });
 
-
     res.status(201).json({
       message: "Anak uploaded successfully and RecapRt created/updated",
       anakKader: anakKaderRecord,
@@ -204,7 +277,6 @@ const unggahAnak = async (req, res) => {
     res.status(500).json({ error: "Internal Server Error" });
   }
 };
-
 
 const editAnak = async (req, res) => {
   try {
@@ -241,7 +313,7 @@ const editAnak = async (req, res) => {
       beratBadan: parseFloat(beratBadan),
       tinggiBadan: parseFloat(tinggiBadan), // Using tinggiBadan from req.body
       anemia: true, // Temporarily set to true as requested
-      stunting: true, // Temporarily set to true as requested
+      stunting: "Normal", // Temporarily set to true as requested
       tanggal: new Date(tanggalPemeriksaan), // Ensure it's a Date object
       id: id,
 
