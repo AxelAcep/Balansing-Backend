@@ -1,13 +1,14 @@
 const express = require("express");
 const { passport } = require("../passport");
 
-const { login, registerKader, logout, requestPasswordReset, handleResetPasswordPage, updatePasswordFromForm } = require("../controllers");
+const { login, registerKader, logout, requestPasswordReset, handleResetPasswordPage, updatePasswordFromForm, registerIbu } = require("../controllers");
 
 const { loginRateLimiter } = require("../middlewares/RateLimit");
 
 const router = express.Router();
 
 router.post("/registerKader", registerKader);
+router.post("/registerIbu", registerIbu)
 router.post("/login", loginRateLimiter, login);
 router.post("/logout", logout);
 

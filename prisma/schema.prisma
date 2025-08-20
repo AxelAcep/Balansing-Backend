@@ -45,12 +45,13 @@ model IbuRumah {
   id          String      @id @default(cuid())
   email       String      @unique
   provinsi    String
+  nama        String
   kota        String
   kecamatan   String
   kelurahan   String
   rt          String
   rw          String
-  kodePos     String
+  kodePos     String?
   alamat      String
   usia        Int
   noTelp      String

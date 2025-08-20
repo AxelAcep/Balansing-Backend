@@ -474,6 +474,119 @@ const changePassword = async (req, res) => {
   }
 };
 
+const registerIbu = async (req, res) => {
+  const {
+    email,
+    password,
+    namaIbu,
+    provinsi,
+    kota,
+    kecamatan,
+    kelurahan,
+    rt,
+    rw,
+    usia,
+    noTelp,
+    kodePos,
+    alamat,
+  } = req.body;
+
+  // Validasi input dasar
+  if (!email || !password  || !namaIbu || !provinsi || !kota || !kecamatan || !kelurahan || !rt || !rw) {
+    return res.status(400).json({ message: 'Semua field wajib diisi kecuali kodePos.' });
+  }
+
+  try {
+    // 1. Membuat user di autentikasi Supabase
+    // Supabase akan menghash password ini secara otomatis di auth.users
+    const { data: supabaseUser, error: supabaseError } = await supabaseAdmin.auth.signUp({ // Gunakan supabaseAdmin
+      email: email,
+      password: password,
+    });
+
+    if (supabaseError) {
+      console.error("Supabase registration error:", supabaseError.message);
+      if (supabaseError.message.includes("User already registered")) {
+        return res.status(409).json({ message: 'Email sudah terdaftar.' }); // Pesan lebih umum
+      }
+      return res.status(500).json({ message: 'Gagal mendaftar user di Supabase Auth.', error: supabaseError.message });
+    }
+
+    // Pastikan user Supabase berhasil dibuat dan memiliki ID
+    if (!supabaseUser || !supabaseUser.user || !supabaseUser.user.id) {
+        // Ini seharusnya tidak terjadi jika tidak ada supabaseError, tapi sebagai fallback
+        return res.status(500).json({ message: 'Gagal mendapatkan ID user dari Supabase Auth.' });
+    }
+
+    // 2. Membuat data User baru ke database Prisma
+    // PENTING: JANGAN SIMPAN PASSWORD DI SINI. Gunakan ID dari Supabase Auth.
+    let newUser;
+    try {
+      newUser = await prisma.user.create({
+        data: {
+          id: supabaseUser.user.id, // Gunakan ID dari Supabase Auth sebagai primary key atau foreign key
+          email: email,
+          jenis: 'IBU', // Set jenis user sebagai 'KADER'
+        },
+      });
+    } catch (prismaUserError) {
+      console.error("Prisma User creation error:", prismaUserError);
+      // Jika pembuatan User di Prisma gagal, hapus user dari Supabase Auth
+      await supabaseAdmin.auth.admin.deleteUser(supabaseUser.user.id);
+      return res.status(500).json({ message: 'Gagal membuat data user di database (Prisma).', error: prismaUserError.message });
+    }
+
+    // 3. Membuat data baru di Kader
+    let newIbu;
+    try {
+      newIbu = await prisma.ibuRumah.create({
+        data: {
+          id: generateRandomId(), // Oke
+          nama: namaIbu, 
+          provinsi: provinsi, // Oke
+          kota: kota, // Oke
+          kecamatan: kecamatan, // Oke
+          kelurahan: kelurahan, // Oke
+          rt: rt, // Oke
+          rw: rw, // Oke
+          kodePos: kodePos || null,
+          usia: usia,
+          noTelp: noTelp,
+          alamat: alamat,
+          user: {
+            connect: {
+                email: email,
+            }
+          }
+        },
+      });
+    } catch (prismaKaderError) {
+      console.error("Prisma Kader creation error:", prismaKaderError);
+      // Jika pembuatan Kader di Prisma gagal, hapus user dari Supabase Auth dan Prisma User
+      if (supabaseUser && supabaseUser.user && supabaseUser.user.id) {
+        await supabaseAdmin.auth.admin.deleteUser(supabaseUser.user.id);
+      }
+      // PERBAIKAN: Gunakan email untuk menghapus user dari tabel Prisma
+      await prisma.user.delete({ where: { email: email } }); // <--- PERBAIKAN DI SINI
+      return res.status(500).json({ message: 'Gagal membuat data kader di database.', error: prismaKaderError.message });
+    }
+
+    res.status(201).json({
+      message: 'Registrasi kader berhasil! Silakan cek email Anda untuk verifikasi (jika diaktifkan).',
+      user: {
+        id: newUser.id,
+        email: newUser.email,
+        jenis: newUser.jenis,
+      },
+      ibu: newIbu,
+    });
+
+  } catch (error) {
+    console.error("General registration error:", error);
+    res.status(500).json({ message: 'Terjadi kesalahan server.', error: error.message });
+  }
+};
+
 module.exports = {
   changePassword,
   login,
@@ -481,5 +594,6 @@ module.exports = {
   logout,
   requestPasswordReset,
   handleResetPasswordPage,
-  updatePasswordFromForm
+  updatePasswordFromForm,
+  registerIbu,
 };
