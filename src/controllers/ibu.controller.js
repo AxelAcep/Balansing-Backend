@@ -9,6 +9,9 @@ const passport = require('../passport'); // Jika Anda menggunakan passport
 const jwt = require('jsonwebtoken');
 const { get } = require("http");
 const { register } = require("module");
+const dayjs = require('dayjs');
+const isBetween = require('dayjs/plugin/isBetween');
+dayjs.extend(isBetween);
 
 // Supabase Client untuk sisi client (jika Anda menggunakannya di backend untuk beberapa kasus)
 // Biasanya ini untuk operasi yang memerlukan kunci ANON_KEY
@@ -55,6 +58,252 @@ const getIbu = async (req, res) => {
   }
 };    
 
+const getAnakIbubyId = async (req, res) => {
+  try{
+    const { id } = req.params; // Assuming id is the unique identifier for AnakKader
+    if (!id) {
+      return res.status(400).json({ error: "ID is required." });
+    }
+
+    const recap = await prisma.anakIbu.findUnique({
+      where: { id: id }, // Ensure id is parsed to an integer if it's a number
+    });
+
+    if (!recap) {
+      return res.status(200).json({ message: "No recap found with this ID." });
+    }
+
+    res.status(200).json(recap);
+  } catch (error) {
+    console.error("Error fetching recap by ID:", error);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+}
+
+const deleteAnakbyId = async (req, res) => {
+  try{
+    const { id } = req.params; // Assuming id is the unique identifier for AnakKader
+    if (!id) {
+      return res.status(400).json({ error: "ID is required." });
+    }
+
+    const recap = await prisma.anakIbu.delete({
+      where: { id: id }, // Ensure id is parsed to an integer if it's a number
+    });
+
+    if (!recap) {
+      return res.status(200).json({ message: "No recap found with this ID." });
+    }
+
+    res.status(200).json(recap);
+  } catch (error) {
+    console.error("Error fetching recap by ID:", error);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+}
+
+const addAnak = async (req, res) => {
+  try{
+    const { email, nama, beratBadan, tinggiBadan, jenisKelamin, usia,
+    } = req.body;
+
+    const today = dayjs();
+    const birthDate = dayjs(usia);
+    const usiaInMonths = today.diff(birthDate, 'month');
+
+    // Panggil API untuk memeriksa stunting
+    let stuntingStatus;
+    try {
+      // Mengubah jenis kelamin menjadi 'l' atau 'p' sebelum dikirim ke API
+      let kelaminUntukAPI;
+      if (jenisKelamin.toLowerCase() === 'laki-laki') {
+        kelaminUntukAPI = 'l';
+      } else if (jenisKelamin.toLowerCase() === 'perempuan') {
+        kelaminUntukAPI = 'p';
+      } else {
+        // Fallback jika input tidak sesuai
+        console.warn("Invalid 'jenisKelamin' value. Defaulting to 'l'.");
+        kelaminUntukAPI = 'l';
+      }
+
+      const stuntingResponse = await fetch('http://localhost:4500/stunting', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          // Mengubah key agar sesuai dengan model FastAPI
+          usiaBulan: usiaInMonths,
+          tinggi: parseFloat(tinggiBadan),
+          kelamin: kelaminUntukAPI, // Menggunakan nilai yang sudah diubah
+        }),
+      });
+
+      if (!stuntingResponse.ok) {
+        // Log pesan error dari server Python jika tersedia
+        const errorText = await stuntingResponse.text();
+        console.error(`API Error Response: ${errorText}`);
+        throw new Error(`HTTP error! status: ${stuntingResponse.status}`);
+      }
+
+      const stuntingResult = await stuntingResponse.json();
+      stuntingStatus = stuntingResult; // Mengambil nilai string dari respons
+    } catch (error) {
+      console.error("Error calling stunting API:", error);
+      // Lempar error untuk menghentikan proses unggah jika API gagal
+      throw new Error("Failed to get stunting status from API.");
+    }
+
+    console.log(stuntingStatus);
+
+    if(stuntingStatus == "Sangat Pendek"){
+      stuntingStatus = "SangatPendek";
+    }
+
+    const anakIbuData = {
+      nama: nama,
+      jenisKelamin: jenisKelamin,
+      emailIbu: email,
+      usia: usia,
+      beratBadan: parseFloat(beratBadan),
+      tinggiBadan: parseFloat(tinggiBadan),
+      anemia: false, 
+      stunting: stuntingStatus, // Nilai diperbarui dari respons API
+    };
+
+    // Create AnakKader record
+    const anakIbuRecord = await prisma.anakIbu.create({
+      data: anakIbuData,
+    });
+
+    res.status(201).json({
+      message: "Anak uploaded successfully and RecapRt created/updated",
+      anakKader: anakIbuRecord,
+    });
+
+
+  }catch (error) {
+    console.error("Error updating kader:", error);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+}
+
+const editAnak = async (req, res) => {
+  try {
+    const {
+      id,
+      email,
+      nama,
+      beratBadan,
+      tinggiBadan,
+      jenisKelamin,
+      usia,
+    } = req.body;
+
+    const today = dayjs();
+    const birthDate = dayjs(usia);
+    const usiaInMonths = today.diff(birthDate, 'month');
+
+    // Panggil API untuk memeriksa stunting
+    let stuntingStatus;
+    try {
+      // Mengubah jenis kelamin menjadi 'l' atau 'p' sebelum dikirim ke API
+      let kelaminUntukAPI;
+      if (jenisKelamin.toLowerCase() === 'laki-laki') {
+        kelaminUntukAPI = 'l';
+      } else if (jenisKelamin.toLowerCase() === 'perempuan') {
+        kelaminUntukAPI = 'p';
+      } else {
+        // Fallback jika input tidak sesuai
+        console.warn("Invalid 'jenisKelamin' value. Defaulting to 'l'.");
+        kelaminUntukAPI = 'l';
+      }
+
+      const stuntingResponse = await fetch('http://localhost:4500/stunting', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          // Mengubah key agar sesuai dengan model FastAPI
+          usiaBulan: usiaInMonths,
+          tinggi: parseFloat(tinggiBadan),
+          kelamin: kelaminUntukAPI, // Menggunakan nilai yang sudah diubah
+        }),
+      });
+
+      if (!stuntingResponse.ok) {
+        // Log pesan error dari server Python jika tersedia
+        const errorText = await stuntingResponse.text();
+        console.error(`API Error Response: ${errorText}`);
+        throw new Error(`HTTP error! status: ${stuntingResponse.status}`);
+      }
+
+      const stuntingResult = await stuntingResponse.json();
+      stuntingStatus = stuntingResult; // Mengambil nilai string dari respons
+    } catch (error) {
+      console.error("Error calling stunting API:", error);
+      // Lempar error untuk menghentikan proses unggah jika API gagal
+      throw new Error("Failed to get stunting status from API.");
+    }
+
+    console.log(stuntingStatus);
+
+    if (stuntingStatus == "Sangat Pendek") {
+      stuntingStatus = "SangatPendek";
+    }
+
+    const anakIbuData = {
+      nama: nama,
+      jenisKelamin: jenisKelamin,
+      emailIbu: email,
+      usia: usia,
+      beratBadan: parseFloat(beratBadan),
+      tinggiBadan: parseFloat(tinggiBadan),
+      stunting: stuntingStatus, // Nilai diperbarui dari respons API
+    };
+
+    // Update the AnakIbu record based on the provided ID
+    const anakIbuRecord = await prisma.anakIbu.update({
+      where: {
+        id: id,
+      },
+      data: anakIbuData,
+    });
+
+    res.status(201).json({
+      message: "Anak updated successfully and RecapRt created/updated",
+      anakKader: anakIbuRecord,
+    });
+  } catch (error) {
+    console.error("Error updating kader:", error);
+    res.status(500).json({
+      error: "Internal Server Error"
+    });
+  }
+};
+
+const getAllAnak = async (req, res) => {
+  try{
+    const {email} = req.params;
+
+    if (!email) {
+      return res.status(400).json({ error: "Email is required." });
+    }
+
+    const recap = await prisma.anakIbu.findMany({
+      where: { emailIbu: email },
+    });
+
+    res.status(200).json(recap || { message: "No recap found for this Ibu." });
+
+
+  }catch (error) {
+    console.error("Error updating kader:", error);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+}
+
 const editIbu = async (req, res) => {
   try {
     const {
@@ -100,6 +349,7 @@ const editIbu = async (req, res) => {
     res.status(500).json({ error: "Internal Server Error" });
   }
 };
+
     
     
 
@@ -108,4 +358,9 @@ const editIbu = async (req, res) => {
 module.exports = {
     getIbu,
     editIbu,
+    addAnak,
+    getAllAnak,
+    getAnakIbubyId,
+    editAnak,
+    deleteAnakbyId,
 };

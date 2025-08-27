@@ -62,16 +62,16 @@ model IbuRumah {
 
 model AnakIbu {
   id            String       @id @default(cuid())
-  ibuId         String
+  emailIbu         String
   nama          String
-  usia          Int
+  usia          DateTime
   beratBadan    Float
   tinggiBadan   Float
   stunting      StuntingType // Ganti tipe data stunting menjadi enum
   anemia        Boolean
   jenisKelamin  String
 
-  ibu           IbuRumah     @relation(fields: [ibuId], references: [id])
+  ibu           IbuRumah     @relation(fields: [emailIbu], references: [email])
 }
 
 model AnakKader {
