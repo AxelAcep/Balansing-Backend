@@ -176,10 +176,11 @@ const unggahAnak = async (req, res) => {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          lemas: konjungtivitaNormal,
+          lemas: tampakLemas,
           riwayat: riwayatAnemia,
           konjungtiva: konjungtivitaNormal,
-          kuku: kukuBersih
+          kuku: kukuBersih,
+          tampakPucat: tampakPucat,
         }),
       });
 
@@ -313,10 +314,11 @@ const editAnak = async (req, res) => {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          lemas: konjungtivitaNormal,
+          lemas: tampakLemas,
           riwayat: riwayatAnemia,
           konjungtiva: konjungtivitaNormal,
-          kuku: kukuBersih
+          kuku: kukuBersih,
+          tampakPucat: tampakPucat,
         }),
       });
 

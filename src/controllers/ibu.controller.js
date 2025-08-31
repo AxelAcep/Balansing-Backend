@@ -188,7 +188,7 @@ const addAnak = async (req, res) => {
   }
 }
 
-const editAnak = async (req, res) => {
+const editAnakIbu = async (req, res) => {
   try {
     const {
       id,
@@ -350,7 +350,263 @@ const editIbu = async (req, res) => {
   }
 };
 
-    
+const getRecapAnakMonthly = async (req, res) => {
+  try {
+    const { ibuId, month, year } = req.body;
+    const parsedMonth = parseInt(month);
+    const parsedYear = parseInt(year);
+
+    if (!ibuId || isNaN(parsedMonth) || isNaN(parsedYear)) {
+      return res.status(400).json({ error: "ibuId, month, and year are required and must be valid numbers." });
+    }
+
+    const RecapMonth = await prisma.recapAnak.findMany({
+      where: {
+        anakIbu: {
+          emailIbu: ibuId,
+        },
+        tanggal: {
+          gte: new Date(month, parsedMonth - 1, 1),
+          lt: new Date(parsedYear, parsedMonth, 1),
+        },
+      },
+      // Tambahkan 'include' untuk mengambil data dari relasi 'anakIbu'
+      include: {
+        anakIbu: {
+          select: {
+            // Pilih field yang ingin Anda sertakan
+            emailIbu: true,
+            nama: true, // Asumsikan ada field 'namaIbu'
+            jenisKelamin: true,
+          },
+        },
+      },
+    });
+
+    // Ubah struktur data agar nama ibu berada di level yang sama
+    const formattedRecap = RecapMonth.map(recap => {
+      const nama = recap.anakIbu.nama;
+      const jenisKelamin = recap.anakIbu.jenisKelamin;
+      // Hapus objek relasi aslinya untuk menjaga struktur tetap datar
+      delete recap.anakIbu;
+      return {
+        ...recap,
+        nama: nama,
+        jenisKelamin: jenisKelamin,
+      };
+    });
+
+    return res.status(200).json(formattedRecap);
+
+  } catch (error) {
+    console.error("Error fetching monthly recap:", error);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+};
+
+const getRecapAnakbyId = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    if (!id) {
+      return res.status(400).json({ error: "ID is required." });
+    }
+
+    // Mengambil recap anak berdasarkan ID yang diberikan (kodeRecap)
+    const currentRecap = await prisma.recapAnak.findUnique({
+      where: { kodeRecap: id },
+      select: {
+        anakIbuId: true,
+        tanggal: true,
+        beratBadan: true,
+        tinggiBadan: true,
+        usia: true,
+        anemia: true,
+        stunting: true,
+        konjungtivitasNormal: true,
+        kukuBersih: true,
+        riwayatAnemia: true,
+        tampakLemas: true,
+        tampakPucat: true,
+        rekomendasi: true,
+        anakIbu: {
+          select: {
+            nama: true,
+            jenisKelamin: true,
+            ibu: {
+              select: {
+                nama: true
+              }
+            }
+          }
+        }
+      }
+    });
+
+    if (!currentRecap) {
+      return res.status(404).json({ message: "No recap found with this ID." });
+    }
+
+    // Mencari recap sebelumnya untuk anak yang sama
+    const previousRecap = await prisma.recapAnak.findFirst({
+      where: {
+        anakIbuId: currentRecap.anakIbuId,
+        tanggal: {
+          lt: currentRecap.tanggal, // Mencari tanggal yang lebih kecil (sebelum) dari tanggal recap saat ini
+        },
+      },
+      orderBy: {
+        tanggal: 'desc', // Mengurutkan dari yang paling baru ke yang paling lama
+      },
+    });
+
+    // Menggabungkan data recap saat ini dan recap sebelumnya ke dalam satu objek
+    const responseData = {
+      currentRecap,
+      previousRecap,
+    };
+
+    res.status(200).json(responseData);
+  } catch (error) {
+    console.error("Error fetching recap:", error);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+};
+
+const addRecapAnak = async (req, res) => {
+  try{
+    const { anakId, tanggal, beratBadan, tinggiBadan, usia, jenisKelamin, konjungtivitaNormal, kukuBersih, riwayatAnemia, tampakLemas, tampakPucat
+    } = req.body;
+
+    console.log(usia);
+    console.log(konjungtivitaNormal)
+    console.log(kukuBersih)
+    console.log(riwayatAnemia)
+    console.log(tampakLemas)
+    console.log(tampakPucat);
+
+    let isAnemic;
+    try {
+      const anemiaResponse = await fetch('http://localhost:4500/anemia', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          lemas: tampakLemas,
+          riwayat: riwayatAnemia,
+          konjungtiva: konjungtivitaNormal,
+          kuku: kukuBersih,
+          tampakPucat: tampakPucat,
+        }),
+      });
+
+      if (!anemiaResponse.ok) {
+        throw new Error(`HTTP error! status: ${anemiaResponse.status}`);
+      }
+
+      const anemiaResult = await anemiaResponse.json();
+      isAnemic = anemiaResult; // Mengambil nilai boolean dari respons
+    } catch (error) {
+      console.error("Error calling anemia API:", error);
+      // Lempar error untuk menghentikan proses unggah jika API gagal
+      throw new Error("Failed to get anemia status from API.");
+    }
+
+    // Panggil API untuk memeriksa stunting
+    let stuntingStatus;
+    try {
+      // Mengubah jenis kelamin menjadi 'l' atau 'p' sebelum dikirim ke API
+      let kelaminUntukAPI;
+      if (jenisKelamin.toLowerCase() === 'laki-laki') {
+        kelaminUntukAPI = 'l';
+      } else if (jenisKelamin.toLowerCase() === 'perempuan') {
+        kelaminUntukAPI = 'p';
+      } else {
+        // Fallback jika input tidak sesuai
+        console.warn("Invalid 'jenisKelamin' value. Defaulting to 'l'.");
+        kelaminUntukAPI = 'l';
+      }
+
+      const stuntingResponse = await fetch('http://localhost:4500/stunting', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          // Mengubah key agar sesuai dengan model FastAPI
+          usiaBulan: usia,
+          tinggi: parseFloat(tinggiBadan),
+          kelamin: kelaminUntukAPI, // Menggunakan nilai yang sudah diubah
+        }),
+      });
+
+      if (!stuntingResponse.ok) {
+        // Log pesan error dari server Python jika tersedia
+        const errorText = await stuntingResponse.text();
+        console.error(`API Error Response: ${errorText}`);
+        throw new Error(`HTTP error! status: ${stuntingResponse.status}`);
+      }
+
+      const stuntingResult = await stuntingResponse.json();
+      stuntingStatus = stuntingResult; // Mengambil nilai string dari respons
+    } catch (error) {
+      console.error("Error calling stunting API:", error);
+      // Lempar error untuk menghentikan proses unggah jika API gagal
+      throw new Error("Failed to get stunting status from API.");
+    }
+
+    console.log(stuntingStatus);
+    console.log(isAnemic);
+
+    if(stuntingStatus == "Sangat Pendek"){
+      stuntingStatus = "SangatPendek";
+    }
+
+    const anakIbuData = {
+      anakIbuId: anakId,
+      tanggal: tanggal,
+      beratBadan: parseFloat(beratBadan),
+      tinggiBadan: parseFloat(tinggiBadan),
+      usia: usia,
+      anemia: isAnemic, 
+      stunting: stuntingStatus, // Nilai diperbarui dari respons API
+      konjungtivitasNormal: konjungtivitaNormal,
+      kukuBersih: kukuBersih,
+      riwayatAnemia: riwayatAnemia,
+      tampakLemas: tampakLemas,
+      tampakPucat: tampakPucat,
+      rekomendasi: "Test Dulu Nanti dari GPT",
+    };
+
+    // Create AnakKader record
+    const anakIbuRecord = await prisma.recapAnak.create({
+      data: anakIbuData,
+    });
+
+    const updateAnakIbu = await prisma.anakIbu.update({
+      where: { id: anakId },
+      data: {
+        anemia: isAnemic,
+        stunting: stuntingStatus,
+        beratBadan: parseFloat(beratBadan),
+        tinggiBadan: parseFloat(tinggiBadan),
+        cekMingguan: true,
+      },
+    });
+
+    res.status(201).json({
+      message: "Anak uploaded successfully and RecapRt created/updated",
+      anakIbu: anakIbuRecord,
+      updateAnakIbu: updateAnakIbu,
+    });
+
+
+  }catch (error) {
+    console.error("Error updating kader:", error);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+}    
     
 
 
@@ -361,6 +617,9 @@ module.exports = {
     addAnak,
     getAllAnak,
     getAnakIbubyId,
-    editAnak,
+    editAnakIbu,
     deleteAnakbyId,
+    addRecapAnak,
+    getRecapAnakbyId,
+    getRecapAnakMonthly,
 };

@@ -55,6 +55,7 @@ model IbuRumah {
   alamat      String
   usia        Int
   noTelp      String
+  cekAnak     DateTime?
 
   user        User        @relation("IbuUser", fields: [email], references: [email])
   anakAnak    AnakIbu[]
@@ -70,8 +71,12 @@ model AnakIbu {
   stunting      StuntingType // Ganti tipe data stunting menjadi enum
   anemia        Boolean
   jenisKelamin  String
+  cekMingguan   Boolean  @default(false)
+  
 
   ibu           IbuRumah     @relation(fields: [emailIbu], references: [email])
+
+  recapAnak       RecapAnak[] 
 }
 
 model AnakKader {
@@ -93,4 +98,23 @@ model AnakKader {
   
   kaderEmail            String
   kader                 Kader        @relation(fields: [kaderEmail], references: [email])
+}
+
+model RecapAnak {
+  kodeRecap            String           @id @default(cuid())
+  anakIbuId            String
+  tanggal              DateTime
+  beratBadan           Float
+  tinggiBadan          Float
+  usia                 Int
+  anemia               Boolean
+  stunting             StuntingType
+  konjungtivitasNormal Boolean
+  kukuBersih           Boolean
+  riwayatAnemia        Boolean
+  tampakLemas          Boolean
+  tampakPucat          Boolean
+  rekomendasi          String
+
+  anakIbu AnakIbu @relation(fields: [anakIbuId], references: [id])
 }
