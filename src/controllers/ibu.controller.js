@@ -80,27 +80,176 @@ const getAnakIbubyId = async (req, res) => {
   }
 }
 
-const deleteAnakbyId = async (req, res) => {
-  try{
-    const { id } = req.params; // Assuming id is the unique identifier for AnakKader
-    if (!id) {
-      return res.status(400).json({ error: "ID is required." });
-    }
+const getDashboardAnak = async (req, res) => {
+    try {
+        const { id } = req.params;
 
-    const recap = await prisma.anakIbu.delete({
-      where: { id: id }, // Ensure id is parsed to an integer if it's a number
+        // Ambil data AnakIbu berdasarkan ID
+        const anakIbu = await prisma.anakIbu.findUnique({
+            where: { id: id },
+        });
+
+        if (!anakIbu) {
+            return res.status(404).json({
+                success: false,
+                message: "Data anak tidak ditemukan."
+            });
+        }
+
+        // Ambil semua data RecapAnak untuk anak tersebut, diurutkan dari yang terbaru
+        const recapAnakData = await prisma.recapAnak.findMany({
+            where: { anakIbuId: id },
+            orderBy: {
+                tanggal: 'desc',
+            },
+        });
+
+        if (recapAnakData.length === 0) {
+            return res.status(404).json({
+                success: false,
+                message: "Data rekap untuk anak ini tidak ditemukan."
+            });
+        }
+
+        // Ambil data terbaru (terbaru)
+        const dataTerbaru = recapAnakData[0];
+        // Ambil data sebelumnya (terbaru kedua, jika ada)
+        const dataSebelumnya = recapAnakData.length > 1 ? recapAnakData[1] : null;
+
+        // Ambil data BB dan TB selama 12 bulan terakhir
+        const now = new Date();
+        const twelveMonthsAgo = new Date(now.setMonth(now.getMonth() - 12));
+
+        const last12MonthsData = await prisma.recapAnak.findMany({
+            where: {
+                anakIbuId: id,
+                tanggal: {
+                    gte: twelveMonthsAgo,
+                },
+            },
+            orderBy: {
+                tanggal: 'asc',
+            },
+        });
+
+        // Hitung rata-rata BB dan TB
+        const totalBB = last12MonthsData.reduce((sum, record) => sum + record.beratBadan, 0);
+        const totalTB = last12MonthsData.reduce((sum, record) => sum + record.tinggiBadan, 0);
+        const averageBB = last12MonthsData.length > 0 ? totalBB / last12MonthsData.length : 0;
+        const averageTB = last12MonthsData.length > 0 ? totalTB / last12MonthsData.length : 0;
+
+        // Siapkan data untuk 12 bulan terakhir (per bulan)
+        const monthlyBB = {};
+        const monthlyTB = {};
+        for (let i = 0; i < 12; i++) {
+            const date = new Date(now);
+            date.setMonth(now.getMonth() + i - 12);
+            const monthYear = `${date.getMonth() + 1}/${date.getFullYear()}`;
+            monthlyBB[monthYear] = 0;
+            monthlyTB[monthYear] = 0;
+        }
+
+        last12MonthsData.forEach(record => {
+            const date = new Date(record.tanggal);
+            const monthYear = `${date.getMonth() + 1}/${date.getFullYear()}`;
+            monthlyBB[monthYear] = record.beratBadan;
+            monthlyTB[monthYear] = record.tinggiBadan;
+        });
+
+        const last12MonthsBB = Object.values(monthlyBB);
+        const last12MonthsTB = Object.values(monthlyTB);
+        
+        // Format respons
+        const responseData = {
+            nama: anakIbu.nama,
+            tanggalPeriksaTerakhir: dataTerbaru.tanggal,
+            bb: dataTerbaru.beratBadan,
+            tb: dataTerbaru.tinggiBadan,
+            umur: dataTerbaru.usia,
+            statusStunting: dataTerbaru.stunting,
+            statusAnemia: dataTerbaru.anemia,
+            zScore: anakIbu.zscore,
+            bbSebelumnya: dataSebelumnya ? dataSebelumnya.beratBadan : null,
+            tbSebelumnya: dataSebelumnya ? dataSebelumnya.tinggiBadan : null,
+            rataRataBB12Bulan: averageBB.toFixed(2),
+            rataRataTB12Bulan: averageTB.toFixed(2),
+            data12BulanTerakhir: {
+                bb: last12MonthsBB,
+                tb: last12MonthsTB,
+            },
+        };
+
+        return res.status(200).json({
+            success: true,
+            data: responseData
+        });
+
+    } catch (error) {
+        console.error("Error in getDashboardAnak:", error);
+        return res.status(500).json({
+            success: false,
+            message: "Terjadi kesalahan server.",
+            error: error.message
+        });
+    }
+};
+
+const getAllRecapAnak = async (req, res) => {
+  try{
+    const {idAnak} = req.params
+    if(!idAnak){
+      return res.status(400).json({ error: "ID is required." });
+    }
+
+    const Allrecap = await prisma.anakIbu.findUnique({
+      where: { anakIbuId: idAnak }, // Ensure id is parsed to an integer if it's a number
     });
 
-    if (!recap) {
+    if (!Allrecap) {
       return res.status(200).json({ message: "No recap found with this ID." });
     }
-
-    res.status(200).json(recap);
-  } catch (error) {
+    res.status(200).json(recap);
+  } catch (error) {
     console.error("Error fetching recap by ID:", error);
     res.status(500).json({ error: "Internal Server Error" });
   }
 }
+
+const deleteAnakbyId = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    if (!id) {
+      return res.status(400).json({ error: "ID is required." });
+    }
+
+    // 1. Hapus semua data RecapAnak yang memiliki relasi dengan AnakIbu
+    //    Ini untuk menghindari error constraint foreign key
+    const deletedRecap = await prisma.recapAnak.deleteMany({
+      where: { anakIbuId: id },
+    });
+
+    // 2. Sekarang, hapus data AnakIbu itu sendiri
+    const deletedAnak = await prisma.anakIbu.delete({
+      where: { id: id },
+    });
+    
+    // Cek apakah AnakIbu berhasil dihapus.
+    // Jika tidak ditemukan, prisma.delete akan melempar error,
+    // jadi tidak perlu cek `if (!deletedAnak)`.
+    
+    console.log(`Berhasil menghapus ${deletedRecap.count} data RecapAnak.`);
+    console.log("Berhasil menghapus data AnakIbu dengan ID:", id);
+
+    res.status(200).json({ message: "Anak dan semua rekap terkait berhasil dihapus." });
+  } catch (error) {
+    if (error.code === 'P2025') { // Error code untuk data tidak ditemukan di Prisma
+      return res.status(404).json({ message: "Anak tidak ditemukan dengan ID ini." });
+    }
+    console.error("Error saat menghapus data Anak:", error);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+};
 
 const addAnak = async (req, res) => {
   try{
@@ -113,6 +262,7 @@ const addAnak = async (req, res) => {
 
     // Panggil API untuk memeriksa stunting
     let stuntingStatus;
+    let zscore;
     try {
       // Mengubah jenis kelamin menjadi 'l' atau 'p' sebelum dikirim ke API
       let kelaminUntukAPI;
@@ -154,7 +304,51 @@ const addAnak = async (req, res) => {
       throw new Error("Failed to get stunting status from API.");
     }
 
+    try {
+      // Mengubah jenis kelamin menjadi 'l' atau 'p' sebelum dikirim ke API
+      let kelaminUntukAPI;
+      if (jenisKelamin.toLowerCase() === 'laki-laki') {
+        kelaminUntukAPI = 'l';
+      } else if (jenisKelamin.toLowerCase() === 'perempuan') {
+        kelaminUntukAPI = 'p';
+      } else {
+        // Fallback jika input tidak sesuai
+        console.warn("Invalid 'jenisKelamin' value. Defaulting to 'l'.");
+        kelaminUntukAPI = 'l';
+      }
+
+      const zResponse = await fetch('http://localhost:4500/zscore', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          // Mengubah key agar sesuai dengan model FastAPI
+          usiaBulan: usiaInMonths,
+          tinggi: parseFloat(tinggiBadan),
+          kelamin: kelaminUntukAPI, // Menggunakan nilai yang sudah diubah
+        }),
+      });
+
+      if (!zResponse.ok) {
+        // Log pesan error dari server Python jika tersedia
+        const errorText = await zResponse.text();
+        console.error(`API Error Response: ${errorText}`);
+        throw new Error(`HTTP error! status: ${zResponse.status}`);
+      }
+
+      const zResult = await zResponse.json();
+      zscore = zResult; // Mengambil nilai string dari respons
+    } catch (error) {
+      console.error("Error calling stunting API:", error);
+      // Lempar error untuk menghentikan proses unggah jika API gagal
+      throw new Error("Failed to get stunting status from API.");
+    }
+
+    
+
     console.log(stuntingStatus);
+    console.log(zscore);
 
     if(stuntingStatus == "Sangat Pendek"){
       stuntingStatus = "SangatPendek";
@@ -169,6 +363,7 @@ const addAnak = async (req, res) => {
       tinggiBadan: parseFloat(tinggiBadan),
       anemia: false, 
       stunting: stuntingStatus, // Nilai diperbarui dari respons API
+      zscore: zscore,
     };
 
     // Create AnakKader record
@@ -378,6 +573,7 @@ const getRecapAnakMonthly = async (req, res) => {
             emailIbu: true,
             nama: true, // Asumsikan ada field 'namaIbu'
             jenisKelamin: true,
+            id: true,
           },
         },
       },
@@ -387,12 +583,14 @@ const getRecapAnakMonthly = async (req, res) => {
     const formattedRecap = RecapMonth.map(recap => {
       const nama = recap.anakIbu.nama;
       const jenisKelamin = recap.anakIbu.jenisKelamin;
+      const id = recap.anakIbu.id;
       // Hapus objek relasi aslinya untuk menjaga struktur tetap datar
       delete recap.anakIbu;
       return {
         ...recap,
         nama: nama,
         jenisKelamin: jenisKelamin,
+        id: id,
       };
     });
 
@@ -433,6 +631,7 @@ const getRecapAnakbyId = async (req, res) => {
           select: {
             nama: true,
             jenisKelamin: true,
+            id: true,
             ibu: {
               select: {
                 nama: true
@@ -563,6 +762,48 @@ const addRecapAnak = async (req, res) => {
       stuntingStatus = "SangatPendek";
     }
 
+    let zscore;
+    try {
+      // Mengubah jenis kelamin menjadi 'l' atau 'p' sebelum dikirim ke API
+      let kelaminUntukAPI;
+      if (jenisKelamin.toLowerCase() === 'laki-laki') {
+        kelaminUntukAPI = 'l';
+      } else if (jenisKelamin.toLowerCase() === 'perempuan') {
+        kelaminUntukAPI = 'p';
+      } else {
+        // Fallback jika input tidak sesuai
+        console.warn("Invalid 'jenisKelamin' value. Defaulting to 'l'.");
+        kelaminUntukAPI = 'l';
+      }
+
+      const zResponse = await fetch('http://localhost:4500/zscore', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          // Mengubah key agar sesuai dengan model FastAPI
+          usiaBulan: usia,
+          tinggi: parseFloat(tinggiBadan),
+          kelamin: kelaminUntukAPI, // Menggunakan nilai yang sudah diubah
+        }),
+      });
+
+      if (!zResponse.ok) {
+        // Log pesan error dari server Python jika tersedia
+        const errorText = await zResponse.text();
+        console.error(`API Error Response: ${errorText}`);
+        throw new Error(`HTTP error! status: ${zResponse.status}`);
+      }
+
+      const zResult = await zResponse.json();
+      zscore = zResult; // Mengambil nilai string dari respons
+    } catch (error) {
+      console.error("Error calling stunting API:", error);
+      // Lempar error untuk menghentikan proses unggah jika API gagal
+      throw new Error("Failed to get stunting status from API.");
+    }
+
     const anakIbuData = {
       anakIbuId: anakId,
       tanggal: tanggal,
@@ -592,6 +833,7 @@ const addRecapAnak = async (req, res) => {
         beratBadan: parseFloat(beratBadan),
         tinggiBadan: parseFloat(tinggiBadan),
         cekMingguan: true,
+        zscore: zscore,
       },
     });
 
@@ -622,4 +864,6 @@ module.exports = {
     addRecapAnak,
     getRecapAnakbyId,
     getRecapAnakMonthly,
+    getAllRecapAnak,
+    getDashboardAnak,
 };

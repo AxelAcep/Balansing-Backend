@@ -1,7 +1,7 @@
 const express = require("express");
 const { passport, authenticateJWT } = require("../passport");
 
-const { getIbu, editIbu, addAnak, getAllAnak, getAnakIbubyId, editAnakIbu, deleteAnakbyId, addRecapAnak, getRecapAnakbyId, getRecapAnakMonthly  } = require("../controllers");
+const { getIbu, getDashboardAnak, editIbu, addAnak, getAllAnak, getAnakIbubyId, editAnakIbu, deleteAnakbyId, addRecapAnak, getRecapAnakbyId, getRecapAnakMonthly, getAllRecapAnak  } = require("../controllers");
 
 const { loginRateLimiter } = require("../middlewares/RateLimit");
 
@@ -20,6 +20,9 @@ router.post("/recap", authenticateJWT, addRecapAnak);
 
 router.get("/recap/:id", authenticateJWT, getRecapAnakbyId);
 router.post("/recapMonthly", authenticateJWT, getRecapAnakMonthly); // new route for monthly recap
+router.get("/allRecapAnak/:idAnak", authenticateJWT, getAllRecapAnak)
+router.get("/dashboard/:id", authenticateJWT, getDashboardAnak);
+
 
 router.get("/test1", (req, res) => {
   res.send("Test");

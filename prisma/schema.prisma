@@ -63,7 +63,7 @@ model IbuRumah {
 
 model AnakIbu {
   id            String       @id @default(cuid())
-  emailIbu         String
+  emailIbu      String
   nama          String
   usia          DateTime
   beratBadan    Float
@@ -72,6 +72,7 @@ model AnakIbu {
   anemia        Boolean
   jenisKelamin  String
   cekMingguan   Boolean  @default(false)
+  zscore        Float?
   
 
   ibu           IbuRumah     @relation(fields: [emailIbu], references: [email])
