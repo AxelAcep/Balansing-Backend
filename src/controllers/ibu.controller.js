@@ -12,6 +12,9 @@ const { register } = require("module");
 const dayjs = require('dayjs');
 const isBetween = require('dayjs/plugin/isBetween');
 dayjs.extend(isBetween);
+const axios = require('axios');
+const FormData = require('form-data');
+const fs = require('fs');
 
 // Supabase Client untuk sisi client (jika Anda menggunakannya di backend untuk beberapa kasus)
 // Biasanya ini untuk operasi yang memerlukan kunci ANON_KEY
@@ -672,6 +675,53 @@ const getRecapAnakbyId = async (req, res) => {
   }
 };
 
+const cekMakanan = async (req, res) => {
+  try {
+    const file = req.file;
+
+    if (!file) {
+      return res.status(400).json({ error: 'Tidak ada file gambar yang diunggah.' });
+    }
+
+    const formData = new FormData();
+    formData.append('file', fs.createReadStream(file.path), file.originalname);
+
+    const yoloResponse = await axios.post('http://localhost:4500/yolo', formData, {
+      headers: {
+        ...formData.getHeaders(),
+      },
+    });
+
+    // Ambil data prediksi dari respons YOLO
+    const predictions = yoloResponse.data.predictions;
+
+    // Gunakan Set untuk menyimpan label unik
+    const uniqueLabels = new Set();
+    
+    // Iterasi melalui prediksi dan tambahkan setiap label ke Set
+    for (const prediction of predictions) {
+      uniqueLabels.add(prediction.label);
+    }
+
+    // Ubah Set menjadi array untuk respons akhir
+    const labelsArray = Array.from(uniqueLabels);
+
+    // Hapus file sementara setelah dikirim
+    fs.unlinkSync(file.path);
+
+    // Kirim respons dengan array label unik
+    res.status(yoloResponse.status).json(labelsArray);
+
+  } catch (error) {
+    console.error('Error saat meneruskan permintaan ke YOLO:', error);
+    if (error.response) {
+      res.status(error.response.status).json(error.response.data);
+    } else {
+      res.status(500).json({ error: 'Terjadi kesalahan pada server.' });
+    }
+  }
+};
+
 const addRecapAnak = async (req, res) => {
   try{
     const { anakId, tanggal, beratBadan, tinggiBadan, usia, jenisKelamin, konjungtivitaNormal, kukuBersih, riwayatAnemia, tampakLemas, tampakPucat
@@ -866,4 +916,5 @@ module.exports = {
     getRecapAnakMonthly,
     getAllRecapAnak,
     getDashboardAnak,
+    cekMakanan,
 };
