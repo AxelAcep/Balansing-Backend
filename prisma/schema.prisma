@@ -119,3 +119,17 @@ model RecapAnak {
 
   anakIbu AnakIbu @relation(fields: [anakIbuId], references: [id])
 }
+
+model Artikel {
+  id      String   @id @default(cuid())
+  judul   String
+  tanggal DateTime
+  konten  String
+  tags    Tag[]    @relation(name: "ArtikelTags")
+}
+
+model Tag {
+  id       String   @id @default(cuid())
+  nama     String   @unique
+  artikel  Artikel[] @relation(name: "ArtikelTags")
+}

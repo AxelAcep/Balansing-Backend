@@ -1,7 +1,7 @@
 const express = require("express");
 const { passport, authenticateJWT } = require("../passport");
 const multer = require('multer');
-const { getIbu ,getDashboardAnak, editIbu, addAnak, getAllAnak, getAnakIbubyId, editAnakIbu, deleteAnakbyId, addRecapAnak, getRecapAnakbyId, getRecapAnakMonthly, getAllRecapAnak, cekMakanan  } = require("../controllers");
+const { getIbu, getArticlebyId ,getAllArticle ,getDashboardAnak, editIbu, addAnak, getAllAnak, getAnakIbubyId, editAnakIbu, deleteAnakbyId, addRecapAnak, getRecapAnakbyId, getRecapAnakMonthly, getAllRecapAnak, cekMakanan  } = require("../controllers");
 const path = require('path');
 const fs = require('fs'); // <--- PENTING: Tambahkan ini untuk menggunakan modul fs
 const { loginRateLimiter } = require("../middlewares/RateLimit");
@@ -46,6 +46,9 @@ router.get("/allRecapAnak/:idAnak", authenticateJWT, getAllRecapAnak);
 router.get("/dashboard/:id", authenticateJWT, getDashboardAnak);
 
 router.post("/makanan", authenticateJWT, upload.single('file') ,cekMakanan);
+
+router.get("/artikel", authenticateJWT, getAllArticle)
+router.get("/artikel/:id", authenticateJWT, getArticlebyId)
 
 router.get("/test1", (req, res) => {
     res.send("Test");

@@ -899,7 +899,40 @@ const addRecapAnak = async (req, res) => {
     res.status(500).json({ error: "Internal Server Error" });
   }
 }    
-    
+
+const getAllArticle = async (req, res) => {
+  try {
+    const AllArticle = await prisma.artikel.findMany({
+      select: {
+        id: true,
+        judul: true,
+        tanggal: true,
+      },
+    });
+
+    res.status(200).json(AllArticle);
+  } catch (error) {
+    console.error("Error fetching articles:", error);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+};
+
+const getArticlebyId = async (req, res) => {
+  try {
+    const { id } = req.params;
+    // Mengambil recap anak berdasarkan ID yang diberikan (kodeRecap)
+    const ArticleDetail = await prisma.artikel.findUnique({
+      where: {
+        id: id
+      }
+    })
+   
+    res.status(200).json(ArticleDetail);
+  } catch (error) {
+    console.error("Error fetching recap:", error);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+};
 
 
 
@@ -917,4 +950,6 @@ module.exports = {
     getAllRecapAnak,
     getDashboardAnak,
     cekMakanan,
+    getAllArticle,
+    getArticlebyId,
 };
