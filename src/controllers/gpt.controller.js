@@ -166,4 +166,52 @@ Hasil markdown harus mudah dibaca & bisa langsung dipakai di Flutter.
   }
 };
 
-module.exports = { getAnalisisSanitasi, getAnalisisGizi };
+const getAnalisisMakanan = async (req, res) => {
+  try {
+    const { DDS } = req.body;
+
+    const prompt = `
+Anda adalah seorang dokter ahli gizi anak dengan fokus pada keberagaman makanan.
+
+Berdasarkan hasil quiz berikut, analisis apakah keberagaman anak sudah cukup atau belum:
+${JSON.stringify(DDS, null, 2)}
+
+PENTING — instruksi yang HARUS dipenuhi:
+1. Dari Total 7 Score Keberagaman bandingka berapa total yang ada dan tidak ada. Jika lebih dari 6 maka beragam, 4-5 Cukup Beragam, 3 kebawah kurang
+  -Sumber Karbohidrat
+  -Kacang legume
+  -Produk susu
+  -Produk daging
+  -Telur
+  -Buah dan sayur lainnya
+  -Buah dan sayur vitamin A
+    
+2. Section Pertama bahas kesimpulan dulu apakah sudah beragam, cukup, atau kurang  
+3. Section selanjutnya bahas apa saja yang kurang dan apa saja yang sudah terpenuhi
+4. Terakhir Bahas dampak pada anak dan rekomendasi berupa aksi
+5. Gunakan Bahasa Indonesia yang jelas dan ringkas. Fokus pada tindakan praktis.
+
+Hasil markdown harus mudah dibaca & bisa langsung dipakai di Flutter.
+`;
+
+    const completion = await client.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [
+        { role: "system", content: "Anda adalah dokter anak ahli gizi anak." },
+        { role: "user", content: prompt },
+      ],
+      temperature: 0.6,
+    });
+
+    const hasil = completion.choices[0].message.content;
+    res.status(201).json({
+      message: "Analisis makanan berhasil dibuat.",
+      rekomendasi: hasil,
+    });
+  } catch (error) {
+    console.error("Error GPT:", error);
+    res.status(500).json({ error: "Gagal menghasilkan analisis makanan." });
+  }
+};
+
+module.exports = { getAnalisisSanitasi, getAnalisisGizi, getAnalisisMakanan };

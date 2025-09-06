@@ -1,7 +1,7 @@
 const express = require("express");
 const { passport, authenticateJWT } = require("../passport");
 const multer = require('multer');
-const { getAnalisisGizi ,getAnalisisSanitasi ,getIbu, getArticlebyId ,getAllArticle ,getDashboardAnak, editIbu, addAnak, getAllAnak, getAnakIbubyId, editAnakIbu, deleteAnakbyId, addRecapAnak, getRecapAnakbyId, getRecapAnakMonthly, getAllRecapAnak, cekMakanan  } = require("../controllers");
+const { getAnalisisGizi ,getAnalisisSanitasi ,getIbu, getArticlebyId ,getAllArticle ,getDashboardAnak, editIbu, addAnak, getAllAnak, getAnakIbubyId, editAnakIbu, deleteAnakbyId, addRecapAnak, getRecapAnakbyId, getRecapAnakMonthly, getAllRecapAnak, cekMakanan, getAnalisisMakanan  } = require("../controllers");
 const path = require('path');
 const fs = require('fs'); // <--- PENTING: Tambahkan ini untuk menggunakan modul fs
 const { loginRateLimiter } = require("../middlewares/RateLimit");
@@ -52,6 +52,7 @@ router.get("/artikel/:id", authenticateJWT, getArticlebyId)
 
 router.post("/analisis-gizi/:id", authenticateJWT, getAnalisisGizi);
 router.post("/analisis-sanitasi", authenticateJWT, getAnalisisSanitasi);
+router.post("/analisis-makanan", authenticateJWT, getAnalisisMakanan);
 
 router.get("/test1", (req, res) => {
     res.send("Test");
