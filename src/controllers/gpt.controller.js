@@ -116,4 +116,54 @@ ${JSON.stringify(previousRecap, null, 2)}
   }
 };
 
-module.exports = { getAnalisisGizi };
+const getAnalisisSanitasi = async (req, res) => {
+  try {
+    const { quizResult } = req.body;
+
+    const prompt = `
+Anda adalah seorang dokter anak dengan fokus pada kebersihan & sanitasi.
+
+Berdasarkan hasil quiz berikut, analisis apakah kebiasaan anak sudah bersih atau masih perlu diperbaiki:
+${JSON.stringify(quizResult, null, 2)}
+
+PENTING — instruksi yang HARUS dipenuhi:
+1.**JANGAN** menampilkan ulang pertanyaan atau jawaban quiz. Langsung masuk ke **analisis mendalam**.
+2. Tulis output **HANYA** dalam format **Markdown** (siap dirender di Flutter). Jangan bungkus dalam code fences 
+3. Berikan evaluasi kesimpulan dulu apakah hasil sanitasi baik, waspada, atau buruk. Tiap ya itu 1 poin. Jika poin 6 keatas indikasi Baik, 4-5 Waspada, dan kurang dari itu buruk
+4. Bahas lanjut  hasil menjadi empat section jelas dengan heading:
+   ## Kesehatan Mulut
+   ## Kebersihan Tangan
+   ## Higiene Toilet
+   ## Penggunaan Air Minum
+5. Untuk **masing-masing section** berikan:
+   - Satu kalimat penilaian singkat (apresiasi jika baik; peringatan jika kurang).
+   - Analisis singkat penyebab/risiko (1-2 paragraf maksimum).
+   - Rekomendasi praktis & spesifik (bullet list) yang bisa dilakukan di rumah (usia-balita aware jika ada usia di 'child').
+   - Tips monitoring & kapan sebaiknya konsultasi ke tenaga kesehatan.
+6. Jika data untuk suatu section **tidak tersedia**, tulis analisis singkat umum + rekomendasi dasar untuk pemeriksaan data tersebut.
+7. Gunakan Bahasa Indonesia yang jelas dan ringkas. Fokus pada tindakan praktis.
+
+Hasil markdown harus mudah dibaca & bisa langsung dipakai di Flutter.
+`;
+
+    const completion = await client.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [
+        { role: "system", content: "Anda adalah dokter anak ahli sanitasi." },
+        { role: "user", content: prompt },
+      ],
+      temperature: 0.6,
+    });
+
+    const hasil = completion.choices[0].message.content;
+    res.status(201).json({
+      message: "Anak uploaded successfully and RecapRt created/updated",
+      rekomendasi: hasil,
+    });;
+  } catch (error) {
+    console.error("Error GPT:", error);
+    res.status(500).json({ error: "Gagal menghasilkan analisis sanitasi." });
+  }
+};
+
+module.exports = { getAnalisisSanitasi, getAnalisisGizi };
