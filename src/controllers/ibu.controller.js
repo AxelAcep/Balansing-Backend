@@ -165,6 +165,7 @@ const getDashboardAnak = async (req, res) => {
         // Format respons
         const responseData = {
             nama: anakIbu.nama,
+            rekomendasi: dataTerbaru.rekomendasi,
             tanggalPeriksaTerakhir: dataTerbaru.tanggal,
             bb: dataTerbaru.beratBadan,
             tb: dataTerbaru.tinggiBadan,
@@ -734,6 +735,9 @@ const addRecapAnak = async (req, res) => {
     console.log(tampakLemas)
     console.log(tampakPucat);
 
+    newberatBadan = Number(beratBadan).toFixed(1); // hasilnya "70.0" (string)
+    newtinggiBadan = Number(tinggiBadan).toFixed(1);
+
     let isAnemic;
     try {
       const anemiaResponse = await fetch('http://localhost:4500/anemia', {
@@ -857,8 +861,8 @@ const addRecapAnak = async (req, res) => {
     const anakIbuData = {
       anakIbuId: anakId,
       tanggal: tanggal,
-      beratBadan: parseFloat(beratBadan),
-      tinggiBadan: parseFloat(tinggiBadan),
+      beratBadan: parseFloat(newberatBadan),
+      tinggiBadan: parseFloat(newtinggiBadan),
       usia: usia,
       anemia: isAnemic, 
       stunting: stuntingStatus, // Nilai diperbarui dari respons API
@@ -880,8 +884,8 @@ const addRecapAnak = async (req, res) => {
       data: {
         anemia: isAnemic,
         stunting: stuntingStatus,
-        beratBadan: parseFloat(beratBadan),
-        tinggiBadan: parseFloat(tinggiBadan),
+        beratBadan: parseFloat(newberatBadan),
+        tinggiBadan: parseFloat(newtinggiBadan),
         cekMingguan: true,
         zscore: zscore,
       },
@@ -907,6 +911,8 @@ const getAllArticle = async (req, res) => {
         id: true,
         judul: true,
         tanggal: true,
+        tags: true,
+        gambar: true,
       },
     });
 
@@ -924,6 +930,8 @@ const getArticlebyId = async (req, res) => {
     const ArticleDetail = await prisma.artikel.findUnique({
       where: {
         id: id
+      },include: {
+        tags: true
       }
     })
    

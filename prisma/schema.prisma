@@ -125,6 +125,7 @@ model Artikel {
   judul   String
   tanggal DateTime
   konten  String
+  gambar  String?
   tags    Tag[]    @relation(name: "ArtikelTags")
 }
 
