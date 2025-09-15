@@ -36,6 +36,8 @@ model Kader {
   rt              String
   rw              String
   kodePos         String?
+  rekomendasi     DateTime   @default(now())
+  tinjauan        String?
 
   user            User        @relation("KaderUser", fields: [email], references: [email])
   anakKader       AnakKader[]

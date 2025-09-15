@@ -38,28 +38,36 @@ const getIbu = async (req, res) => {
   try {
     const { email } = req.params;
 
-    // Validate email if necessary (e.g., check for valid email format)
+    // Validate email if necessary
     if (!email) {
       return res.status(400).json({ error: "Email parameter is required." });
     }
 
     const ibu = await prisma.ibuRumah.findUnique({
       where: { email },
+      // Gunakan fitur `_count` untuk menghitung jumlah anak
+      include: {
+        _count: {
+          select: {
+            anakAnak: true,
+          },
+        },
+      },
     });
 
     if (!ibu) {
-      // If no kader is found with the given email
-      return res.status(404).json({ error: "Kader not found." });
+      // If no IbuRumah is found with the given email
+      return res.status(404).json({ error: "Ibu not found." });
     }
 
-    // If kader is found, send it as a JSON response
+    // Jika IbuRumah ditemukan, kirimkan data ibu dan jumlah anaknya
     res.status(200).json(ibu);
 
   } catch (error) {
-    console.error("Error fetching kader:", error); // Log the error for debugging
+    console.error("Error fetching ibu:", error); // Log the error for debugging
     res.status(500).json({ error: "Internal Server Error" });
   }
-};    
+};
 
 const getAnakIbubyId = async (req, res) => {
   try{
@@ -166,6 +174,7 @@ const getDashboardAnak = async (req, res) => {
         const responseData = {
             nama: anakIbu.nama,
             rekomendasi: dataTerbaru.rekomendasi,
+            jenisKelamin: anakIbu.jenisKelamin,
             tanggalPeriksaTerakhir: dataTerbaru.tanggal,
             bb: dataTerbaru.beratBadan,
             tb: dataTerbaru.tinggiBadan,
@@ -368,6 +377,7 @@ const addAnak = async (req, res) => {
       anemia: false, 
       stunting: stuntingStatus, // Nilai diperbarui dari respons API
       zscore: zscore,
+      cekMingguan: true,
     };
 
     // Create AnakKader record

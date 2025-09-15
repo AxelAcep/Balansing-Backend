@@ -129,7 +129,7 @@ ${JSON.stringify(quizResult, null, 2)}
 PENTING — instruksi yang HARUS dipenuhi:
 1.**JANGAN** menampilkan ulang pertanyaan atau jawaban quiz. Langsung masuk ke **analisis mendalam**.
 2. Tulis output **HANYA** dalam format **Markdown** (siap dirender di Flutter). Jangan bungkus dalam code fences 
-3. Berikan evaluasi kesimpulan dulu apakah hasil sanitasi baik, waspada, atau buruk. Tiap ya itu 1 poin. Jika poin 6 keatas indikasi Baik, 4-5 Waspada, dan kurang dari itu buruk
+3. Berikan evaluasi kesimpulan dulu apakah hasil sanitasi baik, waspada, atau buruk. Tiap ya atau true itu 1 poin. Jika poin 5 keatas indikasi Baik, 4 Waspada, dan kurang dari itu buruk
 4. Bahas lanjut  hasil menjadi empat section jelas dengan heading:
    ## Kesehatan Mulut
    ## Kebersihan Tangan
