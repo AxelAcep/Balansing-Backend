@@ -10,7 +10,7 @@ const ErrorHandlerMiddleware = require("./middlewares/ErrorHandler");
 
 const app = express();
 app.set("trust proxy", 1);
-const port = 5500;
+const port = 6500;
 
 app.use(
   session({
