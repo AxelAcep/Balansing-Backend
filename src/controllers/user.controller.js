@@ -242,7 +242,7 @@ const requestPasswordReset = async (req, res) => {
 
   try {
     // PERUBAHAN DI SINI: Sesuaikan dengan URL backend Anda
-    const redirectToUrl = 'http://165.22.102.172/api/user/handleresetpassword'; // <--- Ubah ini
+    const redirectToUrl = 'http://165.22.102.172:6500/api/user/handleresetpassword'; // <--- Ubah ini
 
     // Gunakan supabaseAdmin untuk mengirim email reset password
     const { error } = await supabaseAdmin.auth.resetPasswordForEmail(email, {
