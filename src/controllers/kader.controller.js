@@ -170,7 +170,7 @@ const unggahAnak = async (req, res) => {
     // Panggil API untuk memeriksa anemia
     let isAnemic;
     try {
-      const anemiaResponse = await fetch('http://localhost:4500/anemia', {
+      const anemiaResponse = await fetch('https://seruzu-balansing.hf.space/anemia', { 
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -211,7 +211,7 @@ const unggahAnak = async (req, res) => {
         kelaminUntukAPI = 'l';
       }
 
-      const stuntingResponse = await fetch('http://localhost:4500/stunting', {
+      const stuntingResponse = await fetch('https://seruzu-balansing.hf.space/stunting', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -308,7 +308,7 @@ const editAnak = async (req, res) => {
 
     let isAnemic;
     try {
-      const anemiaResponse = await fetch('http://localhost:4500/anemia', {
+      const anemiaResponse = await fetch('https://seruzu-balansing.hf.space/anemia', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -349,7 +349,7 @@ const editAnak = async (req, res) => {
         kelaminUntukAPI = 'l';
       }
 
-      const stuntingResponse = await fetch('http://localhost:4500/stunting', {
+      const stuntingResponse = await fetch('https://seruzu-balansing.hf.space/stunting', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
