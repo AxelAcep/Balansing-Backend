@@ -70,6 +70,8 @@ model AnakIbu {
   usia          DateTime
   beratBadan    Float
   tinggiBadan   Float
+  beratBadanL   Float?
+  tinggiBadanL  Float?
   stunting      StuntingType // Ganti tipe data stunting menjadi enum
   anemia        Boolean
   jenisKelamin  String

@@ -169,6 +169,24 @@ const getDashboardAnak = async (req, res) => {
 
         const last12MonthsBB = Object.values(monthlyBB);
         const last12MonthsTB = Object.values(monthlyTB);
+
+        let kondisi, kategori;
+        if (anakIbu.beratBadanL < 2500 && anakIbu.tinggiBadanL < 48) {
+          kondisi = "Berat & Tinggi Lahir Kurang";
+          kategori = "kurang";
+        } else if (anakIbu.beratBadanL < 2500) {
+          kondisi = "Berat Lahir Kurang";
+          kategori = "kurang";
+        } else if (anakIbu.tinggiBadanL < 48) {
+          kondisi = "Tinggi Lahir Kurang";
+          kategori = "kurang";
+        } else if (anakIbu.beratBadanL > 4000) {
+          kondisi = "Berat Lahir Lebih";
+          kategori = "lebih";
+        } else {
+          kondisi = "Normal";
+          kategori = "normal";
+        }
         
         // Format respons
         const responseData = {
@@ -178,6 +196,10 @@ const getDashboardAnak = async (req, res) => {
             tanggalPeriksaTerakhir: dataTerbaru.tanggal,
             bb: dataTerbaru.beratBadan,
             tb: dataTerbaru.tinggiBadan,
+            bbL: anakIbu.beratBadanL,
+            tbL: anakIbu.tinggiBadanL,
+            kondisiL: kondisi,
+            kategoriL: kategori,
             umur: dataTerbaru.usia,
             statusStunting: dataTerbaru.stunting,
             statusAnemia: dataTerbaru.anemia,
@@ -266,7 +288,7 @@ const deleteAnakbyId = async (req, res) => {
 
 const addAnak = async (req, res) => {
   try{
-    const { email, nama, beratBadan, tinggiBadan, jenisKelamin, usia,
+    const { email, nama, beratBadan, tinggiBadan, jenisKelamin, usia, beratBadanL, tinggiBadanL
     } = req.body;
 
     const today = dayjs();
@@ -372,6 +394,8 @@ const addAnak = async (req, res) => {
       jenisKelamin: jenisKelamin,
       emailIbu: email,
       usia: usia,
+      beratBadanL: parseFloat(beratBadanL),
+      tinggiBadanL: parseFloat(tinggiBadanL),
       beratBadan: parseFloat(beratBadan),
       tinggiBadan: parseFloat(tinggiBadan),
       anemia: false, 
@@ -405,6 +429,8 @@ const editAnakIbu = async (req, res) => {
       nama,
       beratBadan,
       tinggiBadan,
+      beratBadanL,
+      tinggiBadanL,
       jenisKelamin,
       usia,
     } = req.body;
@@ -469,6 +495,8 @@ const editAnakIbu = async (req, res) => {
       usia: usia,
       beratBadan: parseFloat(beratBadan),
       tinggiBadan: parseFloat(tinggiBadan),
+      beratBadanL: parseFloat(beratBadanL),
+      tinggiBadanL: parseFloat(tinggiBadanL),
       stunting: stuntingStatus, // Nilai diperbarui dari respons API
     };
 
