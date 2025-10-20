@@ -288,7 +288,7 @@ const deleteAnakbyId = async (req, res) => {
 
 const addAnak = async (req, res) => {
   try{
-    const { email, nama, beratBadan, tinggiBadan, jenisKelamin, usia, beratBadanL, tinggiBadanL
+    const { email, nama, beratBadan, tinggiBadan, jenisKelamin, usia, bbLahir, tbLahir
     } = req.body;
 
     const today = dayjs();
@@ -394,8 +394,8 @@ const addAnak = async (req, res) => {
       jenisKelamin: jenisKelamin,
       emailIbu: email,
       usia: usia,
-      beratBadanL: parseFloat(beratBadanL),
-      tinggiBadanL: parseFloat(tinggiBadanL),
+      beratBadanL: parseFloat(bbLahir),
+      tinggiBadanL: parseFloat(tbLahir),
       beratBadan: parseFloat(beratBadan),
       tinggiBadan: parseFloat(tinggiBadan),
       anemia: false, 
