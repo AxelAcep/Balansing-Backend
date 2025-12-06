@@ -167,10 +167,10 @@ const unggahAnak = async (req, res) => {
 
     const usiaInMonths = (parseInt(umurTahun) * 12) + parseInt(umurBulan);
 
-    // Panggil API untuk memeriksa anemia
+    // --- 1. Panggil API untuk memeriksa anemia ---
     let isAnemic;
     try {
-      const anemiaResponse = await fetch('https://seruzu-balansing.hf.space/anemia', { 
+      const anemiaResponse = await fetch('https://seruzu-balansing.hf.space/anemia', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -189,14 +189,16 @@ const unggahAnak = async (req, res) => {
       }
 
       const anemiaResult = await anemiaResponse.json();
-      isAnemic = anemiaResult; // Mengambil nilai boolean dari respons
+      // !!! PERBAIKAN: Ambil nilai Boolean dari key 'anemia' di respons API
+      isAnemic = anemiaResult.anemia; 
+      
     } catch (error) {
       console.error("Error calling anemia API:", error);
       // Lempar error untuk menghentikan proses unggah jika API gagal
-      throw new Error("Failed to get anemia status from API.");
+      return res.status(500).json({ error: "Failed to get anemia status from API." });
     }
 
-    // Panggil API untuk memeriksa stunting
+    // --- 2. Panggil API untuk memeriksa stunting ---
     let stuntingStatus;
     try {
       // Mengubah jenis kelamin menjadi 'l' atau 'p' sebelum dikirim ke API
@@ -206,7 +208,6 @@ const unggahAnak = async (req, res) => {
       } else if (jenisKelamin.toLowerCase() === 'perempuan') {
         kelaminUntukAPI = 'p';
       } else {
-        // Fallback jika input tidak sesuai
         console.warn("Invalid 'jenisKelamin' value. Defaulting to 'l'.");
         kelaminUntukAPI = 'l';
       }
@@ -217,32 +218,33 @@ const unggahAnak = async (req, res) => {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          // Mengubah key agar sesuai dengan model FastAPI
           usiaBulan: usiaInMonths,
           tinggi: parseFloat(tinggiBadan),
-          kelamin: kelaminUntukAPI, // Menggunakan nilai yang sudah diubah
+          kelamin: kelaminUntukAPI,
         }),
       });
 
       if (!stuntingResponse.ok) {
-        // Log pesan error dari server Python jika tersedia
         const errorText = await stuntingResponse.text();
         console.error(`API Error Response: ${errorText}`);
         throw new Error(`HTTP error! status: ${stuntingResponse.status}`);
       }
 
       const stuntingResult = await stuntingResponse.json();
-      stuntingStatus = stuntingResult; // Mengambil nilai string dari respons
+      // !!! PERBAIKAN: Ambil nilai String dari key 'status' di respons API
+      stuntingStatus = stuntingResult.status; 
+      
     } catch (error) {
       console.error("Error calling stunting API:", error);
       // Lempar error untuk menghentikan proses unggah jika API gagal
-      throw new Error("Failed to get stunting status from API.");
+      return res.status(500).json({ error: "Failed to get stunting status from API." });
     }
 
-    console.log(isAnemic);
-    console.log(stuntingStatus);
+    console.log(`Anemia Status (Boolean): ${isAnemic}`);
+    console.log(`Stunting Status (String): ${stuntingStatus}`);
 
-    if(stuntingStatus == "Sangat Pendek"){
+    // Penyesuaian nilai string untuk database (jika diperlukan oleh enum Prisma)
+    if(stuntingStatus === "Sangat Pendek"){
       stuntingStatus = "SangatPendek";
     }
 
@@ -253,8 +255,8 @@ const unggahAnak = async (req, res) => {
       usia: usiaInMonths,
       beratBadan: parseFloat(beratBadan),
       tinggiBadan: parseFloat(tinggiBadan),
-      anemia: isAnemic, // Nilai diperbarui dari respons API
-      stunting: stuntingStatus, // Nilai diperbarui dari respons API
+      anemia: isAnemic,         // Sekarang adalah Boolean
+      stunting: stuntingStatus, // Sekarang adalah String
       tanggal: new Date(tanggalPemeriksaan),
       kaderEmail: email,
       konjungtivitaNormal: konjungtivitaNormal,
@@ -275,6 +277,10 @@ const unggahAnak = async (req, res) => {
     });
   } catch (error) {
     console.error("Error uploading anak:", error);
+    // Tambahkan kondisi untuk menangani error yang dilempar dari catch block internal
+    if (error.message.includes("Failed to get")) {
+         return; // sudah dikirim di catch internal, atau tambahkan res.status(500) di sana
+    }
     res.status(500).json({ error: "Internal Server Error" });
   }
 };

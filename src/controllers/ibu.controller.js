@@ -287,17 +287,16 @@ const deleteAnakbyId = async (req, res) => {
 };
 
 const addAnak = async (req, res) => {
-  try{
-    const { email, nama, beratBadan, tinggiBadan, jenisKelamin, usia, bbLahir, tbLahir
-    } = req.body;
+  try {
+    const { email, nama, beratBadan, tinggiBadan, jenisKelamin, usia, bbLahir, tbLahir } = req.body;
 
     const today = dayjs();
-    const birthDate = dayjs(usia);
+    // Diasumsikan 'usia' adalah tanggal lahir (birthDate) dalam format yang dapat diparsing oleh dayjs
+    const birthDate = dayjs(usia); 
     const usiaInMonths = today.diff(birthDate, 'month');
 
-    // Panggil API untuk memeriksa stunting
+    // --- 1. Panggil API untuk memeriksa stunting ---
     let stuntingStatus;
-    let zscore;
     try {
       // Mengubah jenis kelamin menjadi 'l' atau 'p' sebelum dikirim ke API
       let kelaminUntukAPI;
@@ -306,7 +305,6 @@ const addAnak = async (req, res) => {
       } else if (jenisKelamin.toLowerCase() === 'perempuan') {
         kelaminUntukAPI = 'p';
       } else {
-        // Fallback jika input tidak sesuai
         console.warn("Invalid 'jenisKelamin' value. Defaulting to 'l'.");
         kelaminUntukAPI = 'l';
       }
@@ -317,38 +315,38 @@ const addAnak = async (req, res) => {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          // Mengubah key agar sesuai dengan model FastAPI
           usiaBulan: usiaInMonths,
           tinggi: parseFloat(tinggiBadan),
-          kelamin: kelaminUntukAPI, // Menggunakan nilai yang sudah diubah
+          kelamin: kelaminUntukAPI, 
         }),
       });
 
       if (!stuntingResponse.ok) {
-        // Log pesan error dari server Python jika tersedia
         const errorText = await stuntingResponse.text();
         console.error(`API Error Response: ${errorText}`);
         throw new Error(`HTTP error! status: ${stuntingResponse.status}`);
       }
 
       const stuntingResult = await stuntingResponse.json();
-      stuntingStatus = stuntingResult; // Mengambil nilai string dari respons
+      // !!! PERBAIKAN: Ambil nilai String dari key 'status' di respons API
+      stuntingStatus = stuntingResult.status; 
+      
     } catch (error) {
       console.error("Error calling stunting API:", error);
-      // Lempar error untuk menghentikan proses unggah jika API gagal
-      throw new Error("Failed to get stunting status from API.");
+      // Hentikan proses dan kirim error
+      return res.status(500).json({ error: "Failed to get stunting status from API (Stunting Check)." });
     }
 
+    // --- 2. Panggil API untuk mendapatkan Z-Score ---
+    let zscore;
     try {
-      // Mengubah jenis kelamin menjadi 'l' atau 'p' sebelum dikirim ke API
-      let kelaminUntukAPI;
+      // Kelamin sudah dihitung di atas
+      let kelaminUntukAPI; 
       if (jenisKelamin.toLowerCase() === 'laki-laki') {
         kelaminUntukAPI = 'l';
       } else if (jenisKelamin.toLowerCase() === 'perempuan') {
         kelaminUntukAPI = 'p';
       } else {
-        // Fallback jika input tidak sesuai
-        console.warn("Invalid 'jenisKelamin' value. Defaulting to 'l'.");
         kelaminUntukAPI = 'l';
       }
 
@@ -358,34 +356,33 @@ const addAnak = async (req, res) => {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          // Mengubah key agar sesuai dengan model FastAPI
           usiaBulan: usiaInMonths,
           tinggi: parseFloat(tinggiBadan),
-          kelamin: kelaminUntukAPI, // Menggunakan nilai yang sudah diubah
+          kelamin: kelaminUntukAPI, 
         }),
       });
 
       if (!zResponse.ok) {
-        // Log pesan error dari server Python jika tersedia
         const errorText = await zResponse.text();
-        console.error(`API Error Response: ${errorText}`);
+        console.error(`API Error Response (Z-Score): ${errorText}`);
         throw new Error(`HTTP error! status: ${zResponse.status}`);
       }
 
       const zResult = await zResponse.json();
-      zscore = zResult; // Mengambil nilai string dari respons
+      // !!! PERBAIKAN: Ambil nilai Float dari key 'z_score' di respons API
+      zscore = zResult.z_score; 
+      
     } catch (error) {
-      console.error("Error calling stunting API:", error);
-      // Lempar error untuk menghentikan proses unggah jika API gagal
-      throw new Error("Failed to get stunting status from API.");
+      console.error("Error calling Z-score API:", error);
+      // Hentikan proses dan kirim error
+      return res.status(500).json({ error: "Failed to get Z-score from API." });
     }
-
     
+    console.log(`Stunting Status (String): ${stuntingStatus}`);
+    console.log(`Z-Score (Float): ${zscore}`);
 
-    console.log(stuntingStatus);
-    console.log(zscore);
-
-    if(stuntingStatus == "Sangat Pendek"){
+    // Penyesuaian nilai string untuk database (jika diperlukan oleh Enum/StuntingType Prisma)
+    if(stuntingStatus === "Sangat Pendek"){
       stuntingStatus = "SangatPendek";
     }
 
@@ -393,33 +390,34 @@ const addAnak = async (req, res) => {
       nama: nama,
       jenisKelamin: jenisKelamin,
       emailIbu: email,
-      usia: usia,
+      usia: usia, // Tetap gunakan tanggal lahir (string ISO)
       beratBadanL: parseFloat(bbLahir),
       tinggiBadanL: parseFloat(tbLahir),
       beratBadan: parseFloat(beratBadan),
       tinggiBadan: parseFloat(tinggiBadan),
-      anemia: false, 
-      stunting: stuntingStatus, // Nilai diperbarui dari respons API
-      zscore: zscore,
+      anemia: false, // Disetel ke false karena tidak ada pemeriksaan anemia di sini
+      stunting: stuntingStatus, // Sekarang adalah String/Enum
+      zscore: zscore,           // Sekarang adalah Float
       cekMingguan: true,
     };
 
-    // Create AnakKader record
+    // Create AnakIbu record
     const anakIbuRecord = await prisma.anakIbu.create({
       data: anakIbuData,
     });
 
     res.status(201).json({
-      message: "Anak uploaded successfully and RecapRt created/updated",
+      message: "Anak added successfully.",
       anakKader: anakIbuRecord,
     });
 
-
-  }catch (error) {
-    console.error("Error updating kader:", error);
+  } catch (error) {
+    console.error("Error adding anak:", error);
+    // Jika error sudah ditangani dan respons dikirim di blok catch internal,
+    // maka error di sini adalah error yang tidak terduga.
     res.status(500).json({ error: "Internal Server Error" });
   }
-}
+};
 
 const editAnakIbu = async (req, res) => {
   try {
@@ -435,11 +433,16 @@ const editAnakIbu = async (req, res) => {
       usia,
     } = req.body;
 
+    // Pastikan ID tersedia
+    if (!id) {
+        return res.status(400).json({ error: "ID anak harus disediakan untuk pembaruan." });
+    }
+
     const today = dayjs();
     const birthDate = dayjs(usia);
     const usiaInMonths = today.diff(birthDate, 'month');
 
-    // Panggil API untuk memeriksa stunting
+    // --- Panggil API untuk memeriksa stunting ---
     let stuntingStatus;
     try {
       // Mengubah jenis kelamin menjadi 'l' atau 'p' sebelum dikirim ke API
@@ -449,7 +452,6 @@ const editAnakIbu = async (req, res) => {
       } else if (jenisKelamin.toLowerCase() === 'perempuan') {
         kelaminUntukAPI = 'p';
       } else {
-        // Fallback jika input tidak sesuai
         console.warn("Invalid 'jenisKelamin' value. Defaulting to 'l'.");
         kelaminUntukAPI = 'l';
       }
@@ -460,31 +462,32 @@ const editAnakIbu = async (req, res) => {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          // Mengubah key agar sesuai dengan model FastAPI
           usiaBulan: usiaInMonths,
           tinggi: parseFloat(tinggiBadan),
-          kelamin: kelaminUntukAPI, // Menggunakan nilai yang sudah diubah
+          kelamin: kelaminUntukAPI,
         }),
       });
 
       if (!stuntingResponse.ok) {
-        // Log pesan error dari server Python jika tersedia
         const errorText = await stuntingResponse.text();
         console.error(`API Error Response: ${errorText}`);
         throw new Error(`HTTP error! status: ${stuntingResponse.status}`);
       }
 
       const stuntingResult = await stuntingResponse.json();
-      stuntingStatus = stuntingResult; // Mengambil nilai string dari respons
+      // !!! PERBAIKAN: Ambil nilai String dari key 'status' di respons API
+      stuntingStatus = stuntingResult.status; 
+      
     } catch (error) {
       console.error("Error calling stunting API:", error);
-      // Lempar error untuk menghentikan proses unggah jika API gagal
-      throw new Error("Failed to get stunting status from API.");
+      // Hentikan proses dan kirim error
+      return res.status(500).json({ error: "Failed to get stunting status from API." });
     }
 
-    console.log(stuntingStatus);
+    console.log(`Stunting Status (String): ${stuntingStatus}`);
 
-    if (stuntingStatus == "Sangat Pendek") {
+    // Penyesuaian nilai string untuk database (jika diperlukan oleh Enum/StuntingType Prisma)
+    if (stuntingStatus === "Sangat Pendek") {
       stuntingStatus = "SangatPendek";
     }
 
@@ -497,7 +500,7 @@ const editAnakIbu = async (req, res) => {
       tinggiBadan: parseFloat(tinggiBadan),
       beratBadanL: parseFloat(beratBadanL),
       tinggiBadanL: parseFloat(tinggiBadanL),
-      stunting: stuntingStatus, // Nilai diperbarui dari respons API
+      stunting: stuntingStatus, // Sekarang adalah String/Enum
     };
 
     // Update the AnakIbu record based on the provided ID
@@ -508,12 +511,14 @@ const editAnakIbu = async (req, res) => {
       data: anakIbuData,
     });
 
-    res.status(201).json({
-      message: "Anak updated successfully and RecapRt created/updated",
+    res.status(201).json({ // Menggunakan 200 OK untuk update
+      message: "Anak updated successfully.",
       anakKader: anakIbuRecord,
     });
   } catch (error) {
-    console.error("Error updating kader:", error);
+    console.error("Error updating anak:", error);
+    // Jika error sudah ditangani dan respons dikirim di blok catch internal,
+    // maka error di sini adalah error yang tidak terduga.
     res.status(500).json({
       error: "Internal Server Error"
     });
@@ -773,9 +778,11 @@ const addRecapAnak = async (req, res) => {
     console.log(tampakLemas)
     console.log(tampakPucat);
 
-    newberatBadan = Number(beratBadan).toFixed(1); // hasilnya "70.0" (string)
-    newtinggiBadan = Number(tinggiBadan).toFixed(1);
+    // Ubah ke float, jangan string (toFixed(1) mengembalikan string)
+    const newBeratBadanFloat = parseFloat(beratBadan);
+    const newTinggiBadanFloat = parseFloat(tinggiBadan);
 
+    // --- 1. Panggil API untuk memeriksa anemia ---
     let isAnemic;
     try {
       const anemiaResponse = await fetch('https://seruzu-balansing.hf.space/anemia', {
@@ -797,24 +804,23 @@ const addRecapAnak = async (req, res) => {
       }
 
       const anemiaResult = await anemiaResponse.json();
-      isAnemic = anemiaResult; // Mengambil nilai boolean dari respons
+      // PERBAIKAN: Ambil nilai Boolean dari key 'anemia'
+      isAnemic = anemiaResult.anemia; 
+      
     } catch (error) {
       console.error("Error calling anemia API:", error);
-      // Lempar error untuk menghentikan proses unggah jika API gagal
-      throw new Error("Failed to get anemia status from API.");
+      return res.status(500).json({ error: "Failed to get anemia status from API." });
     }
 
-    // Panggil API untuk memeriksa stunting
+    // --- 2. Panggil API untuk memeriksa stunting ---
     let stuntingStatus;
     try {
-      // Mengubah jenis kelamin menjadi 'l' atau 'p' sebelum dikirim ke API
       let kelaminUntukAPI;
       if (jenisKelamin.toLowerCase() === 'laki-laki') {
         kelaminUntukAPI = 'l';
       } else if (jenisKelamin.toLowerCase() === 'perempuan') {
         kelaminUntukAPI = 'p';
       } else {
-        // Fallback jika input tidak sesuai
         console.warn("Invalid 'jenisKelamin' value. Defaulting to 'l'.");
         kelaminUntukAPI = 'l';
       }
@@ -825,45 +831,41 @@ const addRecapAnak = async (req, res) => {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          // Mengubah key agar sesuai dengan model FastAPI
           usiaBulan: usia,
-          tinggi: parseFloat(tinggiBadan),
-          kelamin: kelaminUntukAPI, // Menggunakan nilai yang sudah diubah
+          tinggi: newTinggiBadanFloat,
+          kelamin: kelaminUntukAPI,
         }),
       });
 
       if (!stuntingResponse.ok) {
-        // Log pesan error dari server Python jika tersedia
         const errorText = await stuntingResponse.text();
         console.error(`API Error Response: ${errorText}`);
         throw new Error(`HTTP error! status: ${stuntingResponse.status}`);
       }
 
       const stuntingResult = await stuntingResponse.json();
-      stuntingStatus = stuntingResult; // Mengambil nilai string dari respons
+      // PERBAIKAN: Ambil nilai String dari key 'status'
+      stuntingStatus = stuntingResult.status; 
+      
     } catch (error) {
       console.error("Error calling stunting API:", error);
-      // Lempar error untuk menghentikan proses unggah jika API gagal
-      throw new Error("Failed to get stunting status from API.");
+      return res.status(500).json({ error: "Failed to get stunting status from API." });
     }
 
-    console.log(stuntingStatus);
-    console.log(isAnemic);
-
-    if(stuntingStatus == "Sangat Pendek"){
+    // Penyesuaian nilai string untuk database (jika diperlukan oleh enum Prisma)
+    if(stuntingStatus === "Sangat Pendek"){
       stuntingStatus = "SangatPendek";
     }
 
+    // --- 3. Panggil API untuk Z-Score ---
     let zscore;
     try {
-      // Mengubah jenis kelamin menjadi 'l' atau 'p' sebelum dikirim ke API
       let kelaminUntukAPI;
       if (jenisKelamin.toLowerCase() === 'laki-laki') {
         kelaminUntukAPI = 'l';
       } else if (jenisKelamin.toLowerCase() === 'perempuan') {
         kelaminUntukAPI = 'p';
       } else {
-        // Fallback jika input tidak sesuai
         console.warn("Invalid 'jenisKelamin' value. Defaulting to 'l'.");
         kelaminUntukAPI = 'l';
       }
@@ -874,73 +876,78 @@ const addRecapAnak = async (req, res) => {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          // Mengubah key agar sesuai dengan model FastAPI
           usiaBulan: usia,
-          tinggi: parseFloat(tinggiBadan),
-          kelamin: kelaminUntukAPI, // Menggunakan nilai yang sudah diubah
+          tinggi: newTinggiBadanFloat,
+          kelamin: kelaminUntukAPI,
         }),
       });
 
       if (!zResponse.ok) {
-        // Log pesan error dari server Python jika tersedia
         const errorText = await zResponse.text();
         console.error(`API Error Response: ${errorText}`);
         throw new Error(`HTTP error! status: ${zResponse.status}`);
       }
 
       const zResult = await zResponse.json();
-      zscore = zResult; // Mengambil nilai string dari respons
+      // PERBAIKAN: Ambil nilai numerik dari key 'zscore' (Asumsi API mengembalikannya dengan key 'zscore')
+      zscore = zResult.zscore; 
+      
     } catch (error) {
-      console.error("Error calling stunting API:", error);
-      // Lempar error untuk menghentikan proses unggah jika API gagal
-      throw new Error("Failed to get stunting status from API.");
+      console.error("Error calling zscore API:", error);
+      return res.status(500).json({ error: "Failed to get zscore from API." });
     }
 
+    console.log(`Stunting Status (String): ${stuntingStatus}`);
+    console.log(`Anemia Status (Boolean): ${isAnemic}`);
+    console.log(`Z-Score (Number): ${zscore}`);
+
+    // Data untuk membuat record baru di recapAnak
     const anakIbuData = {
       anakIbuId: anakId,
-      tanggal: tanggal,
-      beratBadan: parseFloat(newberatBadan),
-      tinggiBadan: parseFloat(newtinggiBadan),
+      tanggal: new Date(tanggal),
+      beratBadan: newBeratBadanFloat,
+      tinggiBadan: newTinggiBadanFloat,
       usia: usia,
-      anemia: isAnemic, 
-      stunting: stuntingStatus, // Nilai diperbarui dari respons API
+      anemia: isAnemic,
+      stunting: stuntingStatus, // Sekarang adalah String/Enum yang valid
       konjungtivitasNormal: konjungtivitaNormal,
       kukuBersih: kukuBersih,
       riwayatAnemia: riwayatAnemia,
       tampakLemas: tampakLemas,
       tampakPucat: tampakPucat,
-      rekomendasi: "Test Dulu Nanti dari GPT",
+      rekomendasi: "Test Dulu Nanti dari GPT", // Tetap
     };
 
-    // Create AnakKader record
+    // Create recapAnak record
     const anakIbuRecord = await prisma.recapAnak.create({
       data: anakIbuData,
     });
 
+    // Update record anakIbu
     const updateAnakIbu = await prisma.anakIbu.update({
       where: { id: anakId },
       data: {
-        anemia: isAnemic,
+        anemia: isAnemic, // PERBAIKAN: Menggunakan 'isAnemic'
         stunting: stuntingStatus,
-        beratBadan: parseFloat(newberatBadan),
-        tinggiBadan: parseFloat(newtinggiBadan),
+        beratBadan: newBeratBadanFloat,
+        tinggiBadan: newTinggiBadanFloat,
         cekMingguan: true,
         zscore: zscore,
       },
     });
 
     res.status(201).json({
-      message: "Anak uploaded successfully and RecapRt created/updated",
+      message: "Data anak berhasil diunggah dan diperbarui.",
       anakIbu: anakIbuRecord,
       updateAnakIbu: updateAnakIbu,
     });
 
-
   }catch (error) {
-    console.error("Error updating kader:", error);
+    console.error("Error updating recap anak:", error);
+    // Jika error sudah ditangani di catch internal, ini mungkin tidak perlu, tapi bagus untuk fallback
     res.status(500).json({ error: "Internal Server Error" });
   }
-}    
+}
 
 const getAllArticle = async (req, res) => {
   try {
