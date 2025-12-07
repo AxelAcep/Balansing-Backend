@@ -333,7 +333,8 @@ const editAnak = async (req, res) => {
       }
 
       const anemiaResult = await anemiaResponse.json();
-      isAnemic = anemiaResult; // Mengambil nilai boolean dari respons
+      isAnemic = anemiaResult.anemia; // Mengambil nilai boolean dari respons
+      console.log("Anemia Result from API:", isAnemic);
     } catch (error) {
       console.error("Error calling anemia API:", error);
       // Lempar error untuk menghentikan proses unggah jika API gagal
@@ -376,7 +377,7 @@ const editAnak = async (req, res) => {
       }
 
       const stuntingResult = await stuntingResponse.json();
-      stuntingStatus = stuntingResult; // Mengambil nilai string dari respons
+      stuntingStatus = stuntingResult.status; // Mengambil nilai string dari respons
     } catch (error) {
       console.error("Error calling stunting API:", error);
       // Lempar error untuk menghentikan proses unggah jika API gagal
@@ -493,9 +494,6 @@ const getAnakKaderByMonth = async (req, res) => {
 };
     
     
-
-
-
 module.exports = {
     getKader,
     editKader,
@@ -504,5 +502,5 @@ module.exports = {
     getRecapById,
     editAnak,
     deleteAnak,
-    getAnakKaderByMonth
+    getAnakKaderByMonth,
 };
