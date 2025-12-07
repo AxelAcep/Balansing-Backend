@@ -15,10 +15,12 @@ dayjs.extend(isBetween);
 const axios = require('axios');
 const FormData = require('form-data');
 const fs = require('fs');
-
+const { addDays, isPast, startOfDay } =  require('date-fns');
 // Supabase Client untuk sisi client (jika Anda menggunakannya di backend untuk beberapa kasus)
 // Biasanya ini untuk operasi yang memerlukan kunci ANON_KEY
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_ANON_KEY); // <--- PERBAIKAN: Gunakan ANON_KEY
+
+const DAYS_TO_ADD = 14;
 
 // Supabase Admin Client untuk operasi backend yang membutuhkan hak akses penuh
 const supabaseAdmin = createClient(
@@ -35,38 +37,51 @@ const supabaseAdmin = createClient(
 const prisma = new PrismaClient();
 
 const getIbu = async (req, res) => {
+  const { email } = req.params;
   try {
-    const { email } = req.params;
+        // --- QUERY 1: Ambil data IbuRumah ---
+        // Query ini akan dijalankan dan ditunggu hasilnya
+        const ibu = await prisma.ibuRumah.findUnique({
+            where: { email },
+            include: {
+                _count: { 
+                    select: { anakAnak: true } 
+                },
+            },
+        });
+        
+        // 2. Error Handling (IbuRumah)
+        if (!ibu) {
+            return res.status(404).json({ message: "Data Ibu Rumah tidak ditemukan." });
+        }
 
-    // Validate email if necessary
-    if (!email) {
-      return res.status(400).json({ error: "Email parameter is required." });
+        // --- QUERY 2: Ambil data GlobalSchedule ---
+        // Query ini akan dijalankan HANYA SETELAH Query 1 selesai
+        const schedule = await prisma.globalSchedule.findUnique({
+            // Catatan: Menggunakan key: '1' sesuai permintaan, 
+            // tapi disarankan menggunakan key deskriptif seperti 'CHECK_RESET_DATE'
+            where: { key: '1' }, 
+            select: { value_date: true, last_execution: true }, 
+        });
+
+        // 3. Error Handling (Schedule)
+        if (!schedule || !schedule.value_date) {
+            return res.status(500).json({ message: "Konfigurasi jadwal global tidak ditemukan." });
+        }
+        
+        // 4. Modifikasi Objek IbuRumah (Menyisipkan Jadwal)
+        
+        // Tambahkan properti dari schedule ke objek ibu
+        ibu.jadwalResetBerikutnya = schedule.value_date; 
+        ibu.terakhirDijalankan = schedule.last_execution; // Menambahkan last_execution juga
+        
+        // 5. Kirim Respon JSON
+        return res.status(200).json(ibu);
+
+    } catch (error) {
+        console.error("Error fetching data sequentially:", error);
+        return res.status(500).json({ message: "Terjadi kesalahan server internal." });
     }
-
-    const ibu = await prisma.ibuRumah.findUnique({
-      where: { email },
-      // Gunakan fitur `_count` untuk menghitung jumlah anak
-      include: {
-        _count: {
-          select: {
-            anakAnak: true,
-          },
-        },
-      },
-    });
-
-    if (!ibu) {
-      // If no IbuRumah is found with the given email
-      return res.status(404).json({ error: "Ibu not found." });
-    }
-
-    // Jika IbuRumah ditemukan, kirimkan data ibu dan jumlah anaknya
-    res.status(200).json(ibu);
-
-  } catch (error) {
-    console.error("Error fetching ibu:", error); // Log the error for debugging
-    res.status(500).json({ error: "Internal Server Error" });
-  }
 };
 
 const getAnakIbubyId = async (req, res) => {
@@ -768,7 +783,7 @@ const cekMakanan = async (req, res) => {
 
 const addRecapAnak = async (req, res) => {
   try{
-    const { anakId, tanggal, beratBadan, tinggiBadan, usia, jenisKelamin, konjungtivitaNormal, kukuBersih, riwayatAnemia, tampakLemas, tampakPucat
+    const { anakId, tanggal, beratBadan, tinggiBadan, usia, jenisKelamin, konjungtivitaNormal, kukuBersih, riwayatAnemia, tampakLemas, tampakPucat, email
     } = req.body;
 
     console.log(usia);
@@ -931,10 +946,26 @@ const addRecapAnak = async (req, res) => {
         stunting: stuntingStatus,
         beratBadan: newBeratBadanFloat,
         tinggiBadan: newTinggiBadanFloat,
-        cekMingguan: true,
+        cekMingguan: false,
         zscore: zscore,
       },
     });
+
+    const checkmingguan = await prisma.anakIbu.findMany({
+      where: {
+        emailIbu: email,
+        cekMingguan: true,
+      },
+    });
+
+    if (checkmingguan.length === 0) {
+      const updateIbu = await prisma.ibuRumah.update({
+        where: { email: email },
+        data: {
+          cekAnak: false,
+        },
+      });
+    }
 
     res.status(201).json({
       message: "Data anak berhasil diunggah dan diperbarui.",
@@ -987,7 +1018,60 @@ const getArticlebyId = async (req, res) => {
   }
 };
 
+const resetIbuRumahChecks = async() => {
+    try {
+        // 1. Ambil Tanggal Target Global dari DB
+        const schedule = await prisma.globalSchedule.findUnique({
+            where: { key: '1' },
+        });
 
+        if (!schedule) {
+            console.error("GlobalSchedule 'CHECK_RESET_DATE' tidak ditemukan. Mohon inisialisasi baris pertama di database.");
+            return;
+        }
+
+        // Kita hanya tertarik pada tanggal (tanpa jam/menit), jadi kita mulai dari awal hari
+        const todayStart = startOfDay(new Date()); 
+        const targetDateStart = startOfDay(schedule.value_date);
+
+        // 2. Cek Apakah Sudah Waktunya (Hari Target SUDAH TERCAPAI atau LEWAT)
+        // isPast akan mengembalikan true jika targetDateStart lebih dahulu dari todayStart
+        if (isPast(targetDateStart) || targetDateStart.getTime() === todayStart.getTime()) {
+            
+            console.log(`[CRON] Tanggal ${targetDateStart.toISOString()} sudah tercapai. Melakukan reset massal...`);
+
+            // 3. Jalankan UPDATE Massal di Database
+            // Mereset cekAnak dan sanitasi menjadi TRUE untuk SEMUA IbuRumah
+            const updateResult = await prisma.ibuRumah.updateMany({
+                data: {
+                    cekAnak: true,
+                    sanitasi: true,
+                },
+            });
+
+            console.log(`[CRON] Berhasil mereset ${updateResult.count} data IbuRumah.`);
+
+            // 4. Hitung Tanggal Target Baru (+14 hari dari TANGGAL TARGET LAMA)
+            // Penting: Selalu tambahkan 14 hari dari target lama, bukan dari hari ini.
+            const newTargetDate = addDays(targetDateStart, DAYS_TO_ADD);
+
+            // 5. Update Tanggal Target Global di DB
+            await prisma.globalSchedule.update({
+                where: { key: 'CHECK_RESET_DATE' },
+                data: {
+                    value_date: newTargetDate,
+                    last_execution: new Date(),
+                },
+            });
+
+            console.log(`[CRON] Jadwal berikutnya diset pada: ${newTargetDate.toISOString()}`);
+        } else {
+            console.log(`[CRON] Belum waktunya reset. Target berikutnya: ${targetDateStart.toISOString()}`);
+        }
+    } catch (error) {
+        console.error("[CRON] Gagal menjalankan resetIbuRumahChecks:", error);
+    }
+  }
 
 module.exports = {
     getIbu,
@@ -1005,4 +1089,5 @@ module.exports = {
     cekMakanan,
     getAllArticle,
     getArticlebyId,
+    resetIbuRumahChecks,
 };

@@ -4,7 +4,7 @@ require("dotenv").config();
 const session = require("express-session");
 const cron = require("node-cron");
 const { passport } = require("./passport");
-const { runScheduledBatchAnalisis } = require("./controllers");
+const { runScheduledBatchAnalisis, resetIbuRumahChecks } = require("./controllers");
 
 const router = require("./routers");
 const NotFoundMiddleware = require("./middlewares/NotFoundHandler");
@@ -33,6 +33,12 @@ app.get("/", (req, res) => {
 app.use(NotFoundMiddleware);
 app.use(ErrorHandlerMiddleware);
 
+cron.schedule('0 0 * * *', () => {
+    console.log(`[CRON] Menjalankan pengecekan reset terjadwal pada: ${new Date().toISOString()}`);
+    resetIbuRumahChecks();
+}, {
+    timezone: "Asia/Jakarta" // Pastikan menggunakan zona waktu yang benar
+});
 
 cron.schedule('00 00 1 * *', async () => {
   console.log('\n📅 [CRON SCHEDULER] Triggered: Batch Analisis Kader');
@@ -57,11 +63,7 @@ cron.schedule('00 00 1 * *', async () => {
   timezone: "Asia/Jakarta"
 });
 
-console.log('✅ Cron Job initialized: Batch Analisis Kader (Setiap tanggal 7 pukul 06:30 WIB)');
-
 
 app.listen(port, () => {
   console.log(`🚀 Server running on port ${port}`); // PERBAIKI: Pakai ()
-  console.log(`📅 Cron job active: Batch analisis akan berjalan setiap tanggal 7 jam 06:30 WIB`); // PERBAIKI: Pakai ()
-  console.log(`🧪 Testing mode: Cron juga berjalan setiap 1 menit`);
 });

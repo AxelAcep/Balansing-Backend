@@ -304,8 +304,8 @@ ${JSON.stringify(previousRecap, null, 2)}
 
 const getAnalisisSanitasi = async (req, res) => {
   try {
-    const { quizResult } = req.body;
-
+    const { quizResult, email } = req.body;
+    
     const prompt = `
 Anda adalah seorang dokter anak dengan fokus pada kebersihan & sanitasi.
 
@@ -342,6 +342,14 @@ Hasil markdown harus mudah dibaca & bisa langsung dipakai di Flutter.
     });
 
     const hasil = completion.choices[0].message.content;
+
+    await prisma.ibuRumah.update({
+      where: { email: email },
+      data: { 
+        sanitasi: false,
+      },
+    });
+
     res.status(201).json({
       message: "Anak uploaded successfully and RecapRt created/updated",
       rekomendasi: hasil,

@@ -15,6 +15,12 @@ enum StuntingType {
   Tinggi
 }
 
+model GlobalSchedule {
+  key             String    @id // Kunci unik, misal: "CHECK_RESET_DATE"
+  value_date      DateTime  // Tanggal target berikutnya untuk reset
+  last_execution  DateTime? // Kapan terakhir kali fungsi reset dijalankan
+}
+
 model User {
   email      String     @id
   id         String
@@ -57,7 +63,8 @@ model IbuRumah {
   alamat      String
   usia        Int
   noTelp      String
-  cekAnak     DateTime?
+  cekAnak     Boolean?
+  sanitasi    Boolean?
 
   user        User        @relation("IbuUser", fields: [email], references: [email])
   anakAnak    AnakIbu[]
