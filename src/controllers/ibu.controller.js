@@ -1073,6 +1073,18 @@ const resetIbuRumahChecks = async() => {
     }
   }
 
+
+  const getBatchAllAnak = async (req, res) => {
+    try{
+      const AllAnak = await prisma.anakIbu.findMany();
+      res.status(200).json(AllAnak);
+    }
+    catch (error) {
+      console.error("Error fetching anak:", error);
+      res.status(500).json({ error: "Internal Server Error" });
+    } 
+  };
+
 module.exports = {
     getIbu,
     editIbu,
@@ -1090,4 +1102,6 @@ module.exports = {
     getAllArticle,
     getArticlebyId,
     resetIbuRumahChecks,
+
+    getBatchAllAnak,
 };
